@@ -3,6 +3,7 @@ Python implementation of STATIS
 '''
 
 import numpy as np
+from scipy.sparse.linalg import eigs
 
 def normalize_tables(X, type='default'):
 
@@ -65,11 +66,9 @@ def get_mass_weight(X):
 
     C = np.dot(Z,Z.T)
 
-
     # Decompose similarity matrix to get table weights
     print "Decomposing similarity matrix..."
 
-    #[t, u] = np.linalg.eig(C)
     [t, u] = eigs(C)
     t = np.real(t)
     u = np.real(u)
@@ -158,7 +157,7 @@ def project_back(X,Q):
 
     return Fi
 
-def statis(X):
+def statis(X, fname='statis_results.npy'):
     # Main STATIS function
 
     Xn = normalize_tables(X)
@@ -168,6 +167,8 @@ def statis(X):
     Nv = [x.shape[1] for x in X]
     F, c_o, c_v, c_t, I = contrib([Xs.shape[0],Xs.shape[1],len(X)], Nv, P, D, Q, m, a, n_comps = 10)
 
-    statis_res = dict(F=F, PI=I, C_rows = c_o, C_cols= c_v, C_tabs=c_t)
+    statis_res = dict(F=F, PI=I, C_rows = c_o, C_cols= c_v, C_tabs=c_t, P = P, D = D, Q = Q)
 
-    np.save('statis_results.npy',statis_res)
+    np.save(fname, statis_res)
+
+    return statis_res
