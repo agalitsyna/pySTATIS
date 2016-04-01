@@ -17,11 +17,13 @@ def normalize_tables(X, type='default'):
     Xn = []
 
     if type == 'default':
+        print "Z-scoring the columns of each matrix..."
         for k in range(K):
             X[k] = zscore(X[k],axis=0,ddof=1)
             Xn.append(X[k]/np.sqrt(np.sum(np.power(X[k],2))))
 
     if type == 'double_center':
+        print "Double-centring the matrices..."
         for i in range(K):
 
             assert X[i].shape[0] != X[i].shape[1]
@@ -29,6 +31,10 @@ def normalize_tables(X, type='default'):
             N = X[i].shape[1]
             C = np.eye(N) - np.ones([N,N])/N
             Xn.append(np.dot(C*0.5, np.dot(X[i], C)))
+
+    if type == 'none':
+        print "Not performing any manipulations on input matrices"
+        Xn = X
 
     return Xn
 
@@ -144,7 +150,14 @@ def contrib(N, Nv, P, D, Q, m, a, n_comps = 3):
 
     return F, c_o, c_v, c_t, I
 
-def project_back(X,Q):
+def project_back(X,Q, path = None, fname = 'bp_' ):
+    # Projects individual tables into consensus
+
+    import os
+    import numpy as np
+
+    if path == None:
+        path = os.path.getcwd()
 
     N = len(X)
     Js = [x.shape[1] for x in X]
@@ -153,21 +166,35 @@ def project_back(X,Q):
     Fi = []
 
     for i in range(N):
-        Fi.append(np.dot(X[i],Q.T[inds == i,]))
+        print "Reconstruction %d of %d" % (i, N)
+        rec = np.dot(X[i],Q[inds == i,])
+        np.save(os.path.join(path, fname + str(i).zfill(3)), rec)
 
-    return Fi
+    return path
+
+def add_table(X, M, sres):
+    # Projects data from new table onto consensus
+    #
+    # X - new table
+    # sres - statis results
+
+    Qs =  np.dot(X.T, np.dot(M, np.dot(sres['P'], np.linalg.inv(sres['D']))))
+
+    Fs = np.dot(X, Qs)
+
+    return Fs
 
 def statis(X, fname='statis_results.npy'):
     # Main STATIS function
 
-    Xn = normalize_tables(X)
+    Xn = normalize_tables(X, type = 'none')
     Xs = lhstack(Xn)
     m, a = get_mass_weight(X)
     [P, D, Q] = gsvd(Xs,m,a)
     Nv = [x.shape[1] for x in X]
     F, c_o, c_v, c_t, I = contrib([Xs.shape[0],Xs.shape[1],len(X)], Nv, P, D, Q, m, a, n_comps = 10)
 
-    statis_res = dict(F=F, PI=I, C_rows = c_o, C_cols= c_v, C_tabs=c_t, P = P, D = D, Q = Q)
+    statis_res = dict(F=F, PI=I, C_rows = c_o, C_cols= c_v, C_tabs=c_t, P = P, D = D, Q = Q, M = m, A = a)
 
     np.save(fname, statis_res)
 
