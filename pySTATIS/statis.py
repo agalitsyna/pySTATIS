@@ -166,6 +166,9 @@ def project_back(X,Q, path = None, fname = 'bp_' ):
     Fi = []
 
     for i in range(N):
+        if os.path.isfile(os.path.join(path, fname + str(i).zfill(3))):
+	  print "File already exists for subject %d" % i
+          continue
         print "Reconstruction %d of %d" % (i, N)
         rec = np.dot(X[i],Q[inds == i,])
         np.save(os.path.join(path, fname + str(i).zfill(3)), rec)
