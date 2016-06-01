@@ -150,7 +150,7 @@ def contrib(N, Nv, P, D, Q, m, a, n_comps = 3):
 
     return F, c_o, c_v, c_t, I
 
-def project_back(X,Q, path = None, fname = 'bp_' ):
+def project_back(X,Q, path = None, fnames = None ):
     # Projects individual tables into consensus
 
     import os
@@ -160,18 +160,32 @@ def project_back(X,Q, path = None, fname = 'bp_' ):
         path = os.path.getcwd()
 
     N = len(X)
+
+    if fnames is not None and len(fnames) > 1:
+        assert len(fnames) == N
+
     Js = [x.shape[1] for x in X]
     inds = np.concatenate([np.repeat(i, Js[i]) for i in range(len(Js))])
 
     Fi = []
 
     for i in range(N):
-        if os.path.isfile(os.path.join(path, fname + str(i).zfill(3))):
+
+        if fnames is None:
+          fn = 'rec_' + str(i).zfill(3)
+        else:
+          if len(fnames) == 1:
+            fn = fnames + str(i).zfill(3)
+          elif len(fnames) > 1:
+            fn = fnames[i]
+
+        if os.path.isfile(os.path.join(path, fn + '.npy')):
 	  print "File already exists for subject %d" % i
           continue
         print "Reconstruction %d of %d" % (i, N)
         rec = np.dot(X[i],Q[inds == i,])
-        np.save(os.path.join(path, fname + str(i).zfill(3)), rec)
+        
+        np.save(os.path.join(path, fn), rec)
 
     return path
 
@@ -187,8 +201,18 @@ def add_table(X, M, sres):
 
     return Fs
 
-def statis(X, fname='statis_results.npy'):
-    # Main STATIS function
+def statis(X, names, fname='statis_results.npy'):
+    """
+    Run STATIS on X
+    
+    Inputs:
+    X: list of tables
+    names: list of labels for each table
+    fname: output filename for storing results 
+    
+    """
+    
+    import numpy as np
 
     Xn = normalize_tables(X, type = 'none')
     Xs = lhstack(Xn)
@@ -196,8 +220,9 @@ def statis(X, fname='statis_results.npy'):
     [P, D, Q] = gsvd(Xs,m,a)
     Nv = [x.shape[1] for x in X]
     F, c_o, c_v, c_t, I = contrib([Xs.shape[0],Xs.shape[1],len(X)], Nv, P, D, Q, m, a, n_comps = 10)
-
-    statis_res = dict(F=F, PI=I, C_rows = c_o, C_cols= c_v, C_tabs=c_t, P = P, D = D, Q = Q, M = m, A = a)
+    
+    colnames = np.concatenate([[n]*X[0].shape[1] for n in names])
+    statis_res = dict(F=F, PI=I, C_rows = c_o, C_cols= c_v, C_tabs=c_t, P = P, D = D, Q = Q, M = m, A = a, names = colnames, results_file = fname)
 
     np.save(fname, statis_res)
 
