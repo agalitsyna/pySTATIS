@@ -189,13 +189,13 @@ def project_back(X,Q, path = None, fnames = None ):
 
     return path
 
-def add_table(X, M, sres):
+def add_table(X, sres):
     # Projects data from new table onto consensus
     #
     # X - new table
     # sres - statis results
 
-    Qs =  np.dot(X.T, np.dot(M, np.dot(sres['P'], np.linalg.inv(sres['D']))))
+    Qs =  np.dot(X.T, (sres['M'] * np.dot(sres['P'], np.linalg.inv(sres['D'])).T).T)
 
     Fs = np.dot(X, Qs)
 
