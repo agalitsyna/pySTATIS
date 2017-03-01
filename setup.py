@@ -11,7 +11,7 @@ here = path.abspath(path.dirname(__file__))
 with open(path.join(here, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 setup(
-    name='sample',
+    name='pySTATIS',
 
     version='0.1.0',
     description='Python implementation of STATIS for analysis of several data tables',
