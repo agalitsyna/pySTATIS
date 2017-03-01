@@ -25,7 +25,7 @@ setup(
 
     # Choose your license
     license='Apache',
-
+    packages=['pySTATIS'],
     py_modules=["statis"],
     
     install_requires=['numpy', 'scipy']
