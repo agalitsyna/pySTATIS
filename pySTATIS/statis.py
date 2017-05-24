@@ -2,228 +2,237 @@
 Python implementation of STATIS
 '''
 
+from __future__ import print_function
+
 import numpy as np
 from scipy.sparse.linalg import eigs
 
-def normalize_tables(X, type='default'):
 
-    # Normalize each input table
+class STATIS(object):
+    def __init__(self):
 
-    print "Normalizing tables..."
+        self.data = None
+        self.n_datasets = None
+        self.n_observations = None
 
-    from scipy.stats.mstats import zscore
+        self.A_ = None
+        self.M_ = None
+        self.X_ = None
 
-    K = len(X)
-    Xn = []
+        self.P_ = None  # Left singular vectors
+        self.Q_ = None  # Right singular vectors
+        self.D_ = None  # Singular values
 
-    if type == 'default':
-        print "Z-scoring the columns of each matrix..."
-        for k in range(K):
-            X[k] = zscore(X[k],axis=0,ddof=1)
-            Xn.append(X[k]/np.sqrt(np.sum(np.power(X[k],2))))
+        self.n_comps_ = None
 
-    if type == 'double_center':
-        print "Double-centring the matrices..."
-        for i in range(K):
+        self.factor_scores_ = None
+        self.partial_factor_scores_ = None
+        self.col_indices_ = None
 
-            assert X[i].shape[0] != X[i].shape[1]
+        self.contrib_obs_ = None
+        self.contrib_var_ = None
+        self.contrib_dat_ = None
+        self.partial_inertia_dat_ = None
 
-            N = X[i].shape[1]
-            C = np.eye(N) - np.ones([N,N])/N
-            Xn.append(np.dot(C*0.5, np.dot(X[i], C)))
+    def fit(self, data):
 
-    if type == 'none':
-        print "Not performing any manipulations on input matrices"
-        Xn = X
-
-    return Xn
-
-def lhstack(X):
-    # Stack horizontally list of numpy arrays
-
-    print "Stacking matrices horizontally..."
-
-    K = len(X)
-    Xs = X[0]
-
-    for k in range(1,K):
-        Xs = np.hstack([Xs, X[k]])
-
-    return Xs
-
-def get_mass_weight(X):
-    # Get masses (M) for each observation (row), equal for each by default
-    # Get weights (A) for each variable (column)
-
-    print "Getting masses for rows and weights for columns..."
-
-    K = len(X)
-    Js = [x.shape[1] for x in X]
-
-    # Get masses
-    m = np.ones(X[0].shape[0])/X[0].shape[0]
-
-    # Get similarity matrix
-    print "Computing Z..."
-
-    Z = np.vstack([np.dot(x, x.T).flatten() for x in X])
-
-    print "Computing C..."
-
-    C = np.dot(Z,Z.T)
-
-    # Decompose similarity matrix to get table weights
-    print "Decomposing similarity matrix..."
-
-    [t, u] = eigs(C)
-    t = np.real(t)
-    u = np.real(u)
-    u_r = u[:,0]/sum(u[:,0])
-    a = np.concatenate([np.repeat(u_r[i],Js[i]) for i in range(K)])
-
-    return m, a
-
-def gsvd(X, m, a):
-
-    print "Performing GSVD on the horizontally concatenated matrix..."
-
-    M = np.diag(m)
-    A = np.diag(a)
-
-    Xt = np.dot(np.sqrt(M),np.dot(X, np.sqrt(A)))
-
-    [P, D, Q] = np.linalg.svd(Xt, full_matrices=False)
-
-    Mp = np.power(m,-0.5)
-    Ap = np.power(a,-0.5)
-
-    Pt = np.dot(np.diag(Mp),P)
-    Qt = np.dot(np.diag(Ap),Q.T)
-    D = np.diag(D)
-
-    return Pt, D, Qt
-
-def contrib(N, Nv, P, D, Q, m, a, n_comps = 3):
-    # Calculate contributions of observations, variables and tables
-    #
-    # N - vector with number of rows, columns and tables in input data
-    # Nv - vector with number if variables for each table
-    # P - left singular vectors from GSVD
-    # D - singular values from GSVD
-    # Q - right singular vectors from GSVD
-    # m - vector of masses of observations
-    # a - vector of variable weights
-    # n_comps - number of latent variables to compute contributions
-
-    print "Calculating contributions of rows, columns and tables..."
-
-    F = np.dot(P,D)[:,0:n_comps]
-
-    # observations
-
-    c_o = np.zeros([N[0],n_comps])
-
-    for l in range(n_comps):
-        for i in range(N[0]):
-            c_o[i,l] = m[i] * F[i,l]**2 / D[l,l]**2
-
-    # variables
-
-    c_v = np.zeros([N[1], n_comps])
-
-    for l in range(n_comps):
-        for j in range(N[1]):
-            c_v[j,l] = a[j] * Q[j,l]**2
-
-    # tables
-
-    c_t = np.zeros([N[2], n_comps])
-    inds = np.concatenate([np.repeat(i, Nv[i]) for i in range(len(Nv))])
-
-    for l in range(n_comps):
-        for k in range(N[2]):
-            c_t[k,l] = np.sum(c_v[inds==k,l])
-
-    # partial intertia for tables
-
-    I = c_t * np.diag(D)[range(n_comps)]**2
-
-    return F, c_o, c_v, c_t, I
-
-def project_back(X,Q, path = None, fnames = None ):
-    # Projects individual tables into consensus
-
-    import os
-    import numpy as np
-
-    if path == None:
-        path = os.path.getcwd()
-
-    N = len(X)
-
-    if fnames is not None and len(fnames) > 1:
-        assert len(fnames) == N
-
-    Js = [x.shape[1] for x in X]
-    inds = np.concatenate([np.repeat(i, Js[i]) for i in range(len(Js))])
-
-    Fi = []
-
-    for i in range(N):
-
-        if fnames is None:
-          fn = 'rec_' + str(i).zfill(3)
-        else:
-          if len(fnames) == 1:
-            fn = fnames + str(i).zfill(3)
-          elif len(fnames) > 1:
-            fn = fnames[i]
-
-        if os.path.isfile(os.path.join(path, fn + '.npy')):
-	  print "File already exists for subject %d" % i
-          continue
-        print "Reconstruction %d of %d" % (i, N)
-        rec = np.dot(X[i],Q[inds == i,])
+        """
+        Main method to run STATIS on input data. Input data must be a list of STATISData objects.
         
-        np.save(os.path.join(path, fn), rec)
+        :param data: List of STATISdata objects
+        """
 
-    return path
+        self.data = data
+        self.n_datasets = len(self.data)
+        self.n_observations = self.data[0].data.shape[0]
 
-def add_table(X, sres):
-    # Projects data from new table onto consensus
-    #
-    # X - new table
-    # sres - statis results
+        # Pre-process
+        self.rv_pca()
+        self.get_A()
+        self.get_M()
+        self.stack_tables()
 
-    Qs =  np.dot(X.T, (sres['M'] * np.dot(sres['P'], np.linalg.inv(sres['D'])).T).T)
+        # Decompose
+        self.gsvd()
 
-    Fs = np.dot(X, Qs)
+        # Get indices for each dataset
+        self.get_col_indices()
 
-    return Fs
+        # Post-processing
+        self.calc_factor_scores()
+        self.calc_partial_factor_scores()
+        self.calc_contrib_obs()
+        self.calc_contrib_var()
+        self.calc_contrib_dat()
+        self.calc_partial_interia_dat()
 
-def statis(X, names, fname='statis_results.npy'):
-    """
-    Run STATIS on X
-    
-    Inputs:
-    X: list of tables
-    names: list of labels for each table
-    fname: output filename for storing results 
-    
-    """
-    
-    import numpy as np
+        print("Done!")
 
-    Xn = normalize_tables(X, type = 'none')
-    Xs = lhstack(Xn)
-    m, a = get_mass_weight(X)
-    [P, D, Q] = gsvd(Xs,m,a)
-    Nv = [x.shape[1] for x in X]
-    F, c_o, c_v, c_t, I = contrib([Xs.shape[0],Xs.shape[1],len(X)], Nv, P, D, Q, m, a, n_comps = 10)
-    
-    colnames = np.concatenate([[n]*X[0].shape[1] for n in names])
-    statis_res = dict(F=F, PI=I, C_rows = c_o, C_cols= c_v, C_tabs=c_t, P = P, D = D, Q = Q, M = m, A = a, names = colnames, results_file = fname)
+    def rv_pca(self):
 
-    np.save(fname, statis_res)
+        """
+        Get weights for tables by calculating their similarity.
+        
+        :return: 
+        """
 
-    return statis_res
+        print("Running Rv-PCA...")
+        C = np.zeros([self.n_datasets, self.n_datasets])
+
+        for i in xrange(self.n_datasets):
+            for j in xrange(0, self.n_datasets):
+                C[i, j] = np.sum(self.data[i].crossp * self.data[j].crossp)
+
+        _, u = eigs(C, k=1)
+
+        self.table_weights_ = np.real(u) / np.sum(np.real(u))
+
+    def get_A(self):
+        """
+        Masses for tables.
+        """
+        print("Getting table masses...")
+        a = np.concatenate([np.repeat(self.table_weights_[i], self.data[i].n_var) for i in range(self.n_datasets)])
+        self.A_ = np.diag(a)
+
+    def get_M(self):
+        """
+        Masses for observations. These are assumed to be equal.
+        """
+        print("Getting observation masses...")
+        self.M_ = np.eye(self.n_observations) / self.n_observations
+
+    def stack_tables(self):
+        """
+        Stacks preprocessed tables horizontally
+        """
+
+        print("Stacking tables...")
+
+        self.X_ = np.concatenate([self.data[i].data_std for i in range(self.n_datasets)], axis=1)
+
+    def get_col_indices(self):
+
+        """
+        Returns dict(s) that maps IDs to columns 
+        
+        :return: 
+        """
+        IDS = []
+        for i in xrange(self.n_datasets):
+            IDS.append(self.data[i].ID)
+        self.IDS = IDS
+
+        """
+        self.col_indices_ = dict.fromkeys(IDS)
+        c = 0
+        for i, u in enumerate(IDS):
+            self.col_indices_[u] = np.arange(c, c + self.data[i].n_var)
+            c += self.data[i].n_var
+        """
+
+        self.col_indices_ = []
+        c = 0
+        for i, u in enumerate(IDS):
+            self.col_indices_.append(np.arange(c, c + self.data[i].n_var))
+            c += self.data[i].n_var
+
+    def gsvd(self):
+
+        print("Performing GSVD on the horizontally concatenated matrix...")
+
+        self.Xw_ = np.dot(np.sqrt(self.M_), np.dot(self.X_, np.sqrt(self.A_)))
+
+        [P, self.D_, Q] = np.linalg.svd(self.Xw_, full_matrices=False)
+
+        Mp = np.power(np.diag(self.M_), -0.5)
+        Ap = np.power(np.diag(self.A_), -0.5)
+
+        self.P_ = np.dot(np.diag(Mp), P)
+        self.Q_ = np.dot(np.diag(Ap), Q.T)
+        self.ev_ = np.power(self.D_, 2)
+
+        self.n_comps_ = len(self.D_)
+
+    def calc_factor_scores(self):
+        """
+        Calculates factor scores for each observation.
+        """
+
+        print("Calculating factor scores for observations...")
+        self.factor_scores_ = np.dot(self.P_, np.diag(self.D_))
+
+    def calc_partial_factor_scores(self):
+
+        """
+        Projects individual scores onto the group-level component.
+        """
+
+        print("Calculating factor scores for datasets...")
+
+        """
+        self.partial_factor_scores_ = dict.fromkeys(self.IDS)
+
+        for k, val in self.col_indices_.iteritems():
+            self.partial_factor_scores_[k] = np.inner(self.X_[:, val], self.Q_[val, :].T)
+        """
+
+        self.partial_factor_scores_ = []
+
+        for i, val in enumerate(self.col_indices_):
+            self.partial_factor_scores_.append(np.inner(self.X_[:, val], self.Q_[val, :].T))
+
+        self.partial_factor_scores_ = np.array(self.partial_factor_scores_)
+
+    def calc_contrib_obs(self):
+
+        """
+        Contributions of observations (rows of the matrix)
+        
+        :return: 
+        """
+        print("Calculating contributions of observations...")
+
+        self.contrib_obs_ = np.zeros([self.n_observations, len(self.D_)])
+
+        for l in range(self.n_comps_):
+            for i in range(self.n_observations):
+                self.contrib_obs_[i, l] = self.M_[i, i] * self.factor_scores_[i, l] ** 2 / self.ev_[l]
+
+    def calc_contrib_var(self):
+
+        """
+        Contributions of variables to a group-level components.
+        :return: 
+        """
+
+        print("Calculating contributions of variables...")
+        self.contrib_var_ = np.zeros([self.X_.shape[1], self.n_comps_])
+
+        for l in range(self.n_comps_):
+            for j in range(self.X_.shape[1]):
+                self.contrib_var_[j, l] = self.A_[j, j] * self.Q_[j, l] ** 2
+
+    def calc_contrib_dat(self):
+
+        """
+        Contributions of datasets/tables to the compromise.
+        
+        :return: 
+        """
+
+        print("Calculating contributions of datasets...")
+        self.contrib_dat_ = np.zeros([self.n_datasets, self.n_comps_])
+
+        for l in range(self.n_comps_):
+            for i, k in enumerate(self.col_indices_):
+                self.contrib_dat_[i, l] = np.sum(self.contrib_var_[k, l])
+
+    def calc_partial_interia_dat(self):
+        """
+        Partial inertias for datasets/tables.
+        
+        :return: 
+        """
+        print("Calculating partial inertias for the datasets...")
+        self.partial_inertia_dat_ = self.contrib_dat_ * self.ev_
