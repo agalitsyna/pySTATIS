@@ -32,9 +32,9 @@ class STATISData(object):
         self.cross_product()
 
         if ev is not None:
-            self.data_scaled = self.data * self.ev
+            self.data_scaled = self.data_std * self.ev
         else:
-            self.data_scaled = self.data
+            self.data_scaled = self.data_std
 
     def normalize(self, method=None):
 
