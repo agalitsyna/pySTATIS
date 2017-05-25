@@ -143,6 +143,7 @@ class STATIS(object):
         print("Stacking tables...")
 
         self.X_ = np.concatenate([self.data[i].data_std for i in range(self.n_datasets)], axis=1)
+        self.X_scaled_ = np.concatenate([self.data[i].data_scaled for i in range(self.n_datasets)], axis=1)
 
     def get_col_indices(self):
 
@@ -216,7 +217,7 @@ class STATIS(object):
         self.partial_factor_scores_ = []
 
         for i, val in enumerate(self.col_indices_):
-            self.partial_factor_scores_.append(np.inner(self.X_[:, val], self.Q_[val, :].T))
+            self.partial_factor_scores_.append(np.inner(self.X_scaled_[:, val], self.Q_[val, :].T))
 
         self.partial_factor_scores_ = np.array(self.partial_factor_scores_)
 
