@@ -4,7 +4,7 @@ from scipy.stats.mstats import zscore
 
 
 class STATISData(object):
-    def __init__(self, X, ID, normalize=('zscore', 'norm_one'), col_names=None, row_names=None):
+    def __init__(self, X, ID, groups = ['group_1','group_2'], normalize=('zscore', 'norm_one'), col_names=None, row_names=None):
         """
         X: input variables for a single entity
         ID: ID of the entity; can be a set
@@ -15,6 +15,7 @@ class STATISData(object):
         self.data = X
         self.ID = ID
         self.n_var = X.shape[1]
+        self.groups = groups
 
         if col_names is None:
             self.col_names = ['col_%s' % str(i).zfill(5) for i in range(X.shape[1])]

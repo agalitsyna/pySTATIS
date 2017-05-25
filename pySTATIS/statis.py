@@ -25,6 +25,10 @@ class STATIS(object):
 
         self.n_comps_ = None
 
+        self.groups_ = None
+        self.ugroups_ = None
+        self.n_groupings_ = None
+
         self.factor_scores_ = None
         self.partial_factor_scores_ = None
         self.col_indices_ = None
@@ -33,6 +37,7 @@ class STATIS(object):
         self.contrib_var_ = None
         self.contrib_dat_ = None
         self.partial_inertia_dat_ = None
+        self.contrib_grp_ = None
 
     def fit(self, data):
 
@@ -47,6 +52,8 @@ class STATIS(object):
         self.n_observations = self.data[0].data.shape[0]
 
         # Pre-process
+        self.get_ids()
+        self.get_groups()
         self.rv_pca()
         self.get_A()
         self.get_M()
@@ -67,6 +74,32 @@ class STATIS(object):
         self.calc_partial_interia_dat()
 
         print("Done!")
+
+    def get_groups(self):
+
+        """
+        Extracts the information about groups membership from the datasets.
+        
+        :return: 
+        """
+
+        self.groups_ = []
+        for g in self.data:
+            self.groups_.append(g.groups)
+        self.groups_ = np.array(self.groups_)
+
+        self.ugroups_ = []
+        for i in range(self.groups_.shape[1]):
+            self.ugroups_.append(np.unique(self.groups_[:, i]))
+
+        self.n_groupings_ = len(self.ugroups_)
+
+    def get_ids(self):
+
+        self.ids_ = []
+
+        for i in self.data:
+            self.ids_.append(i.ID)
 
     def rv_pca(self):
 
@@ -118,10 +151,6 @@ class STATIS(object):
         
         :return: 
         """
-        IDS = []
-        for i in xrange(self.n_datasets):
-            IDS.append(self.data[i].ID)
-        self.IDS = IDS
 
         """
         self.col_indices_ = dict.fromkeys(IDS)
@@ -133,9 +162,16 @@ class STATIS(object):
 
         self.col_indices_ = []
         c = 0
-        for i, u in enumerate(IDS):
+        for i, u in enumerate(self.ids_):
             self.col_indices_.append(np.arange(c, c + self.data[i].n_var))
             c += self.data[i].n_var
+
+        self.grp_indices_ = []
+        for i, ug in enumerate(self.ugroups_):
+            ginds = []
+            for g in ug:
+                ginds.append(np.concatenate(map(self.col_indices_.__getitem__, np.where(self.groups_[:,i] == g)[0])))
+            self.grp_indices_.append(ginds)
 
     def gsvd(self):
 
