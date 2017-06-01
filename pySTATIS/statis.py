@@ -42,7 +42,7 @@ class STATIS(object):
     def fit(self, data):
 
         """
-        Main method to run STATIS on input data. Input data must be a list of STATISData objects.
+        Main method to run STATIS on input example_data. Input example_data must be a list of STATISData objects.
         
         :param data: List of STATISdata objects
         """
@@ -157,8 +157,8 @@ class STATIS(object):
         self.col_indices_ = dict.fromkeys(IDS)
         c = 0
         for i, u in enumerate(IDS):
-            self.col_indices_[u] = np.arange(c, c + self.data[i].n_var)
-            c += self.data[i].n_var
+            self.col_indices_[u] = np.arange(c, c + self.example_data[i].n_var)
+            c += self.example_data[i].n_var
         """
 
         self.col_indices_ = []

@@ -8,6 +8,7 @@ class STATISData(object):
         """
         X: input variables for a single entity
         ID: ID of the entity; can be a set
+        ev: eigenvalues of the X columns, in case that X are principal components
         col_names, row_names: labels for rows and columns
         normalize: normalization method to use (None, 'zscore', 'double_center')
         """

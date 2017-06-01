@@ -177,3 +177,6 @@ def get_wine_data():
          ]
 
     return X
+
+if __name__ == '__main__':
+      get_wine_data()
