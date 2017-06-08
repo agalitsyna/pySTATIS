@@ -35,12 +35,14 @@ class STATISData(object):
             self.row_names = col_names
 
         self.normalize(method=normalize)
+        """
         if similarity is 'cross_product':
             self.cross_product()
         elif similarity is 'covariance':
             self.covariance()
         elif similarity is 'double_center':
             self.double_center()
+        """
 
         if ev is not None:
             self.data_scaled = self.data_std * self.ev
@@ -113,6 +115,12 @@ class STATIS(object):
         self.partial_inertia_dat_ = None
         self.contrib_grp_ = None
 
+    def gen_affinity_input(self):
+
+        for d in self.data:
+            d.cross_product()
+
+
     def fit(self, data):
 
         """
@@ -126,6 +134,7 @@ class STATIS(object):
         self.n_observations = self.data[0].data.shape[0]
 
         # Pre-process
+        self.gen_affinity_input()
         self.get_ids()
         self.get_groups()
         self.rv_pca()
@@ -188,7 +197,7 @@ class STATIS(object):
 
         for i in xrange(self.n_datasets):
             for j in xrange(0, self.n_datasets):
-                C[i, j] = np.sum(self.data[i].crossp * self.data[j].crossp)
+                C[i, j] = np.sum(self.data[i].crossp_ * self.data[j].crossp_)
 
         _, u = eigs(C, k=1)
 
@@ -225,14 +234,6 @@ class STATIS(object):
         Returns dict(s) that maps IDs to columns 
         
         :return: 
-        """
-
-        """
-        self.col_indices_ = dict.fromkeys(IDS)
-        c = 0
-        for i, u in enumerate(IDS):
-            self.col_indices_[u] = np.arange(c, c + self.example_data[i].n_var)
-            c += self.example_data[i].n_var
         """
 
         self.col_indices_ = []
@@ -280,13 +281,6 @@ class STATIS(object):
         """
 
         print("Calculating factor scores for datasets...")
-
-        """
-        self.partial_factor_scores_ = dict.fromkeys(self.IDS)
-
-        for k, val in self.col_indices_.iteritems():
-            self.partial_factor_scores_[k] = np.inner(self.X_[:, val], self.Q_[val, :].T)
-        """
 
         self.partial_factor_scores_ = []
 
@@ -347,3 +341,10 @@ class STATIS(object):
         """
         print("Calculating partial inertias for the datasets...")
         self.partial_inertia_dat_ = self.contrib_dat_ * self.ev_
+
+class dualSTATIS(STATIS):
+
+    def gen_affinity_input(self):
+
+        for d in self.data:
+            d.covariance()
