@@ -23,6 +23,7 @@ class STATISData(object):
         self.ID = ID
         self.n_var = X.shape[1]
         self.groups = groups
+        self.data_std_ = None
 
         if col_names is None:
             self.col_names = ['col_%s' % str(i).zfill(5) for i in range(X.shape[1])]
@@ -45,15 +46,15 @@ class STATISData(object):
         """
 
         if ev is not None:
-            self.data_scaled = self.data_std * self.ev
+            self.data_scaled_ = self.data_std_ * self.ev
         else:
-            self.data_scaled = self.data_std
+            self.data_scaled_ = self.data_std_
 
     def normalize(self, method=None):
 
         if method is 'None':
             print("Not performing any normalizations")
-            self.data_std = self.data
+            self.data_std_ = self.data
         else:
             temp = self.data
             for m in method:
@@ -66,7 +67,7 @@ class STATISData(object):
                 else:
                     print("Method not implemented, use 'zscore' and/or 'double_center'")
 
-                self.data_std = temp
+                self.data_std_ = temp
 
     def cross_product(self):
 
