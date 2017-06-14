@@ -5,14 +5,17 @@ Python implementation of STATIS
 from __future__ import print_function
 
 import numpy as np
-from scipy.sparse.linalg import eigs
 from scipy.stats.mstats import zscore
 
 from core.helpers import gen_affinity_input, get_ids, get_groups
 from core.decomposition import rv_pca, get_A, get_M, stack_tables, gsvd, get_col_indices
+from core.contrib import calc_factor_scores, calc_partial_factor_scores, calc_contrib_var, calc_contrib_obs, \
+    calc_contrib_dat, calc_partial_interia_dat
+
 
 class STATISData(object):
-    def __init__(self, X, ID, ev = None, groups = ['group_1','group_2'], normalize=('zscore', 'norm_one'), col_names=None, row_names=None):
+    def __init__(self, X, ID, ev=None, groups=['group_1', 'group_2'], normalize=('zscore', 'norm_one'), col_names=None,
+                 row_names=None):
         """
         X: input variables for a single entity
         ID: ID of the entity; can be a set
@@ -71,14 +74,15 @@ class STATISData(object):
 
     def covariance(self):
 
-        self.affinity_ = np.cov(self.data_std_, rowvar = False)
+        self.affinity_ = np.cov(self.data_std_, rowvar=False)
 
     def double_center(self):
 
-        assert self.data_std_.shape[0] == self.data_std_.shape[1], "Error: double centering requires a square matrix (correlation or covariance)"
+        assert self.data_std_.shape[0] == self.data_std_.shape[
+            1], "Error: double centering requires a square matrix (correlation or covariance)"
 
         cmat = np.eye(self.data_std_.shape[0]) - np.ones_like(self.data_std_) * data_std_.shape[0]
-        self.affinity_ = 0.5*cmat.dot(self.data_std_.dot(cmat))
+        self.affinity_ = 0.5 * cmat.dot(self.data_std_.dot(cmat))
 
 
 class STATIS(object):
@@ -121,9 +125,11 @@ class STATIS(object):
         :param data: List of STATISdata objects
         """
 
+        import time
+
+        t0 = time.time()
         self.n_datasets = len(data)
         self.n_observations = data[0].data.shape[0]
-
 
         # Pre-process
         self.data = gen_affinity_input(data)
@@ -143,101 +149,24 @@ class STATIS(object):
         self.col_indices_, self.grp_indices_ = get_col_indices(self.data, self.ids_, self.groups_, self.ugroups_)
 
         # Post-process
-        self.calc_factor_scores()
-        self.calc_partial_factor_scores()
-        self.calc_contrib_obs()
-        self.calc_contrib_var()
-        self.calc_contrib_dat()
-        self.calc_partial_interia_dat()
+        self.factor_scores_ = calc_factor_scores(self.P_, self.D_)
+        self.partial_factor_scores_ = calc_partial_factor_scores(self.X_scaled_, self.Q_, self.col_indices_)
+        self.contrib_obs_ = calc_contrib_obs(self.factor_scores_, self.ev_, self.M_, self.D_, self.n_observations,
+                                             self.n_comps_)
+        self.contrib_var_ = calc_contrib_var(self.X_, self.Q_, self.A_, self.n_comps_)
+        self.contrib_dat_ = calc_contrib_dat(self.contrib_var_, self.col_indices_, self.n_datasets, self.n_comps_)
+        self.partial_inertia_dat_ = calc_partial_interia_dat(self.contrib_dat_, self.ev_)
 
-        print("Done!")
+        print('STATIS finished successfully in %.3f seconds' % (time.time() - t0))
 
-    def calc_factor_scores(self):
-        """
-        Calculates factor scores for each observation.
-        """
-
-        print("Calculating factor scores for observations...")
-        self.factor_scores_ = np.dot(self.P_, np.diag(self.D_))
-
-    def calc_partial_factor_scores(self):
-
-        """
-        Projects individual scores onto the group-level component.
-        """
-
-        print("Calculating factor scores for datasets...")
-
-        self.partial_factor_scores_ = []
-
-        for i, val in enumerate(self.col_indices_):
-            self.partial_factor_scores_.append(np.inner(self.X_scaled_[:, val], self.Q_[val, :].T))
-
-        self.partial_factor_scores_ = np.array(self.partial_factor_scores_)
-
-    def calc_contrib_obs(self):
-
-        """
-        Contributions of observations (rows of the matrix)
-        
-        :return: 
-        """
-        print("Calculating contributions of observations...")
-
-        self.contrib_obs_ = np.zeros([self.n_observations, len(self.D_)])
-
-        for l in range(self.n_comps_):
-            for i in range(self.n_observations):
-                self.contrib_obs_[i, l] = self.M_[i, i] * self.factor_scores_[i, l] ** 2 / self.ev_[l]
-
-    def calc_contrib_var(self):
-
-        """
-        Contributions of variables to a group-level components.
-        :return: 
-        """
-
-        print("Calculating contributions of variables...")
-        self.contrib_var_ = np.zeros([self.X_.shape[1], self.n_comps_])
-
-        for l in range(self.n_comps_):
-            for j in range(self.X_.shape[1]):
-                self.contrib_var_[j, l] = self.A_[j, j] * self.Q_[j, l] ** 2
-
-    def calc_contrib_dat(self):
-
-        """
-        Contributions of datasets/tables to the compromise.
-        
-        :return: 
-        """
-
-        print("Calculating contributions of datasets...")
-        self.contrib_dat_ = np.zeros([self.n_datasets, self.n_comps_])
-
-        for l in range(self.n_comps_):
-            for i, k in enumerate(self.col_indices_):
-                self.contrib_dat_[i, l] = np.sum(self.contrib_var_[k, l])
-
-    def calc_partial_interia_dat(self):
-        """
-        Partial inertias for datasets/tables.
-        
-        :return: 
-        """
-        print("Calculating partial inertias for the datasets...")
-        self.partial_inertia_dat_ = self.contrib_dat_ * self.ev_
 
 class dualSTATIS(STATIS):
-
     def gen_affinity_input(self):
-
         for d in self.data:
             d.covariance()
 
+
 class COVSTATIS(STATIS):
-
     def gen_affinity_input(self):
-
         for d in self.data:
             d.double_center()
