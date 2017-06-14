@@ -13,15 +13,15 @@ with open(path.join(here, 'README.md')) as f:
 setup(
     name='pySTATIS',
 
-    version='0.1.0',
-    description='Python implementation of STATIS for analysis of several data tables',
+    version='0.2.0',
+    description='Python implementation of STATIS for analysis of several example_data tables',
     long_description=long_description,
 
     # The project's main homepage.
     url='https://github.com/mfalkiewicz/pySTATIS',
 
     # Author details
-    author='mfalkiewicz',
+    author='Marcel Falkiewicz',
 
     # Choose your license
     license='Apache',
