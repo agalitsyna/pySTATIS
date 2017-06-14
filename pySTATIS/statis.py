@@ -86,7 +86,7 @@ class STATISData(object):
 
 
 class STATIS(object):
-    def __init__(self, flavor = 'STATIS'):
+    def __init__(self, flavor='STATIS'):
         """
         Initialize STATIS object
         :param flavor: Flavor of STATIS ('STATIS', 'ANISOSTATIS_C1', 'dualSTATIS', 'COVSTATIS')
@@ -122,6 +122,8 @@ class STATIS(object):
         self.partial_inertia_dat_ = None
         self.contrib_grp_ = None
 
+        self.ve_ = None
+
     def fit(self, data):
 
         """
@@ -138,11 +140,11 @@ class STATIS(object):
 
         # Pre-process
         if self.flavor is 'COVSTATIS':
-            self.data = gen_affinity_input(data, type = 'double_center')
+            self.data = gen_affinity_input(data, type='double_center')
         elif self.flavor is 'dualSTATIS':
-            self.data = gen_affinity_input(data, type = 'covariance')
+            self.data = gen_affinity_input(data, type='covariance')
         else:
-            self.data = gen_affinity_input(data, type = 'cross_product')
+            self.data = gen_affinity_input(data, type='cross_product')
 
         self.ids_ = get_ids(self.data)
         self.groups_, self.ugroups_, self.n_groupings_ = get_groups(self.data)
@@ -177,10 +179,10 @@ class STATIS(object):
 
     def print_variance_explained(self):
 
-        self.ve_ = np.round(np.power(self.D_,2)/sum(np.power(self.D_,2)),3)
+        self.ve_ = np.round(np.power(self.D_, 2) / sum(np.power(self.D_, 2)), 3)
 
         print("===================================================================")
         print('Component   % var     % cumulative')
         print('===================================================================')
         for i, v in enumerate(self.ve_):
-            print('%s         %.3f     %.3f' % (str(i+1).zfill(3), v, np.sum(self.ve_[0:i+1])))
+            print('%s         %.3f     %.3f' % (str(i + 1).zfill(3), v, np.sum(self.ve_[0:i + 1])))
