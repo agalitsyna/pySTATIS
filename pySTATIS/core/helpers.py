@@ -1,4 +1,4 @@
-def gen_affinity_input(data):
+def gen_affinity_input(data, type = 'cross_product'):
     """
     Apply the transformation to affinity matrix in the input data. This depends on the type of STATIS used.
 
@@ -8,7 +8,13 @@ def gen_affinity_input(data):
 
     data_wa = data
     for d in data_wa:
-        d.cross_product()
+        if type is 'cross_product':
+            d.cross_product()
+        elif type is 'covariance':
+            d.covariance()
+        elif type is 'double_center':
+            d.double_center()
+
 
     return data_wa
 

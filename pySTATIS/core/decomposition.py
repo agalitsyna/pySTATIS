@@ -1,4 +1,6 @@
 from __future__ import print_function
+import numpy as np
+from scipy.sparse.linalg import eigs
 
 def rv_pca(data, n_datasets):
     """
@@ -6,9 +8,6 @@ def rv_pca(data, n_datasets):
 
     :return:
     """
-
-    from scipy.sparse.linalg import eigs
-    import numpy as np
 
     print("Rv-PCA")
     C = np.zeros([n_datasets, n_datasets])
@@ -29,15 +28,36 @@ def rv_pca(data, n_datasets):
 
     return weights
 
-def get_A(data, table_weights, n_datasets):
+def aniso_c1(X, M):
+    """
+    Calculate weights using ANISOSTATIS criterion 1
+    :param X:
+    :param M:
+    :return: New weights
+    """
+    print("Computing ANISOSTATIS Criterion 1 weights...", end='')
+
+    C = np.power(X.T.dot(M.dot(X)), 2)
+    _, Mn = eigs(C, k=1)
+    Mn = np.real(Mn)
+    Mn = np.concatenate(Mn / np.sum(Mn))
+
+    print('Done!')
+    return Mn
+
+def get_A(data, table_weights, n_datasets, flavor):
     """
     Dataset masses.
 
     """
-    import numpy as np
 
-    print("Dataset masses... ", end='')
-    a = np.concatenate([np.repeat(table_weights[i], data[i].n_var) for i in range(n_datasets)])
+    print("Dataset/variable masses... ", end='')
+    if flavor is 'STATIS':
+        a = np.concatenate([np.repeat(table_weights[i], data[i].n_var) for i in range(n_datasets)])
+    elif 'ANISOSTATIS' in flavor:
+        a = table_weights
+    else:
+        raise ValueError('You specified a non-existing STATIS flavor!')
     print("Done!")
     return np.diag(a)
 
@@ -45,8 +65,6 @@ def get_M(n_obs):
     """
     Masses for observations. These are assumed to be equal.
     """
-
-    import numpy as np
 
     print("Observation masses: Done!")
 
@@ -56,8 +74,6 @@ def stack_tables(data, n_datasets):
     """
     Stacks preprocessed tables horizontally
     """
-
-    import numpy as np
 
     print("Stack datasets for GSVD...", end='')
 
@@ -76,8 +92,6 @@ def get_col_indices(data, ids, groups, ugroups):
     """
 
     print('Getting indices... ', end = '')
-
-    import numpy as np
 
     col_indices = []
     c = 0
@@ -105,10 +119,8 @@ def gsvd(X, M, A):
     :param A:
     :return:
     """
-    import numpy as np
 
     print("GSVD")
-
     print("GSVD: Weights... ", end='')
     Xw = np.dot(np.sqrt(M), np.dot(X, np.sqrt(A)))
     print("Done!")

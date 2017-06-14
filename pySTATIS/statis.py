@@ -8,7 +8,7 @@ import numpy as np
 from scipy.stats.mstats import zscore
 
 from core.helpers import gen_affinity_input, get_ids, get_groups
-from core.decomposition import rv_pca, get_A, get_M, stack_tables, gsvd, get_col_indices
+from core.decomposition import rv_pca, get_A, get_M, stack_tables, gsvd, get_col_indices, aniso_c1
 from core.contrib import calc_factor_scores, calc_partial_factor_scores, calc_contrib_var, calc_contrib_obs, \
     calc_contrib_dat, calc_partial_interia_dat
 
@@ -86,12 +86,17 @@ class STATISData(object):
 
 
 class STATIS(object):
-    def __init__(self):
+    def __init__(self, flavor = 'STATIS'):
+        """
+        Initialize STATIS object
+        :param flavor: Flavor of STATIS ('STATIS', 'ANISOSTATIS_C1', 'dualSTATIS', 'COVSTATIS')
+        """
 
         self.data = None
         self.n_datasets = None
         self.n_observations = None
         self.inds_ = None
+        self.flavor = flavor
 
         self.A_ = None
         self.M_ = None
@@ -132,15 +137,26 @@ class STATIS(object):
         self.n_observations = data[0].data.shape[0]
 
         # Pre-process
-        self.data = gen_affinity_input(data)
+        if self.flavor is 'COVSTATIS':
+            self.data = gen_affinity_input(data, type = 'double_center')
+        elif self.flavor is 'dualSTATIS':
+            self.data = gen_affinity_input(data, type = 'covariance')
+        else:
+            self.data = gen_affinity_input(data, type = 'cross_product')
+
         self.ids_ = get_ids(self.data)
         self.groups_, self.ugroups_, self.n_groupings_ = get_groups(self.data)
 
         # Get weights and prepare for GSVD
-        self.table_weights_ = rv_pca(self.data, self.n_datasets)
-        self.A_ = get_A(self.data, self.table_weights_, self.n_datasets)
         self.M_ = get_M(self.n_observations)
         self.X_, self.X_scaled_ = stack_tables(self.data, self.n_datasets)
+
+        if self.flavor is 'ANISOSTATIS_C1':
+            self.table_weights_ = aniso_c1(self.X_, self.M_)
+        else:
+            self.table_weights_ = rv_pca(self.data, self.n_datasets)
+
+        self.A_ = get_A(self.data, self.table_weights_, self.n_datasets, self.flavor)
 
         # Decompose
         self.P_, self.D_, self.Q_, self.ev_, self.n_comps_ = gsvd(self.X_, self.M_, self.A_)
@@ -159,14 +175,12 @@ class STATIS(object):
 
         print('STATIS finished successfully in %.3f seconds' % (time.time() - t0))
 
+    def print_variance_explained(self):
 
-class dualSTATIS(STATIS):
-    def gen_affinity_input(self):
-        for d in self.data:
-            d.covariance()
+        self.ve_ = np.round(np.power(self.D_,2)/sum(np.power(self.D_,2)),3)
 
-
-class COVSTATIS(STATIS):
-    def gen_affinity_input(self):
-        for d in self.data:
-            d.double_center()
+        print("===================================================================")
+        print('Component   % var     % cumulative')
+        print('===================================================================')
+        for i, v in enumerate(self.ve_):
+            print('%s         %.3f     %.3f' % (str(i+1).zfill(3), v, np.sum(self.ve_[0:i+1])))
