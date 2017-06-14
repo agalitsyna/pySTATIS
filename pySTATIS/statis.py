@@ -9,6 +9,7 @@ from scipy.sparse.linalg import eigs
 from scipy.stats.mstats import zscore
 
 from core.helpers import gen_affinity_input, get_ids, get_groups
+from core.decomposition import rv_pca, get_A, get_M, stack_tables, gsvd, get_col_indices
 
 class STATISData(object):
     def __init__(self, X, ID, ev = None, groups = ['group_1','group_2'], normalize=('zscore', 'norm_one'), col_names=None, row_names=None):
@@ -125,25 +126,23 @@ class STATIS(object):
 
 
         # Pre-process
-        #self.gen_affinity_input()
         self.data = gen_affinity_input(data)
-        #self.get_ids()
         self.ids_ = get_ids(self.data)
-        #self.get_groups()
         self.groups_, self.ugroups_, self.n_groupings_ = get_groups(self.data)
 
-        self.rv_pca()
-        self.get_A()
-        self.get_M()
-        self.stack_tables()
+        # Get weights and prepare for GSVD
+        self.table_weights_ = rv_pca(self.data, self.n_datasets)
+        self.A_ = get_A(self.data, self.table_weights_, self.n_datasets)
+        self.M_ = get_M(self.n_observations)
+        self.X_, self.X_scaled_ = stack_tables(self.data, self.n_datasets)
 
         # Decompose
-        self.gsvd()
+        self.P_, self.D_, self.Q_, self.ev_, self.n_comps_ = gsvd(self.X_, self.M_, self.A_)
 
         # Get indices for each dataset
-        self.get_col_indices()
+        self.col_indices_, self.grp_indices_ = get_col_indices(self.data, self.ids_, self.groups_, self.ugroups_)
 
-        # Post-core
+        # Post-process
         self.calc_factor_scores()
         self.calc_partial_factor_scores()
         self.calc_contrib_obs()
@@ -152,88 +151,6 @@ class STATIS(object):
         self.calc_partial_interia_dat()
 
         print("Done!")
-
-    def rv_pca(self):
-
-        """
-        Get weights for tables by calculating their similarity.
-        
-        :return: 
-        """
-
-        print("Running Rv-PCA...")
-        C = np.zeros([self.n_datasets, self.n_datasets])
-
-        for i in xrange(self.n_datasets):
-            for j in xrange(0, self.n_datasets):
-                C[i, j] = np.sum(self.data[i].affinity_ * self.data[j].affinity_)
-
-        _, u = eigs(C, k=1)
-
-        self.table_weights_ = np.real(u) / np.sum(np.real(u))
-
-    def get_A(self):
-        """
-        Masses for tables.
-        """
-        print("Getting table masses...")
-        a = np.concatenate([np.repeat(self.table_weights_[i], self.data[i].n_var) for i in range(self.n_datasets)])
-        self.A_ = np.diag(a)
-
-    def get_M(self):
-        """
-        Masses for observations. These are assumed to be equal.
-        """
-        print("Getting observation masses...")
-        self.M_ = np.eye(self.n_observations) / self.n_observations
-
-    def stack_tables(self):
-        """
-        Stacks preprocessed tables horizontally
-        """
-
-        print("Stacking tables...")
-
-        self.X_ = np.concatenate([self.data[i].data_std_ for i in range(self.n_datasets)], axis=1)
-        self.X_scaled_ = np.concatenate([self.data[i].data_scaled_ for i in range(self.n_datasets)], axis=1)
-
-    def get_col_indices(self):
-
-        """
-        Returns dict(s) that maps IDs to columns 
-        
-        :return: 
-        """
-
-        self.col_indices_ = []
-        c = 0
-        for i, u in enumerate(self.ids_):
-            self.col_indices_.append(np.arange(c, c + self.data[i].n_var))
-            c += self.data[i].n_var
-
-        self.grp_indices_ = []
-        for i, ug in enumerate(self.ugroups_):
-            ginds = []
-            for g in ug:
-                ginds.append(np.concatenate(map(self.col_indices_.__getitem__, np.where(self.groups_[:,i] == g)[0])))
-            self.grp_indices_.append(ginds)
-
-    def gsvd(self):
-
-        print("Performing GSVD on the horizontally concatenated matrix...")
-
-        self.Xw_ = np.dot(np.sqrt(self.M_), np.dot(self.X_, np.sqrt(self.A_)))
-
-        [P, self.D_, Q] = np.linalg.svd(self.Xw_, full_matrices=False)
-
-        Mp = np.power(np.diag(self.M_), -0.5)
-        Ap = np.power(np.diag(self.A_), -0.5)
-
-        self.P_ = np.dot(np.diag(Mp), P)
-        self.Q_ = np.dot(np.diag(Ap), Q.T)
-        self.ev_ = np.power(self.D_, 2)
-
-        self.n_comps_ = len(self.D_)
 
     def calc_factor_scores(self):
         """
