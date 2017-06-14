@@ -8,8 +8,10 @@ import numpy as np
 from scipy.sparse.linalg import eigs
 from scipy.stats.mstats import zscore
 
+from core.helpers import gen_affinity_input, get_ids, get_groups
+
 class STATISData(object):
-    def __init__(self, X, ID, ev = None, similarity = 'cross_product', groups = ['group_1','group_2'], normalize=('zscore', 'norm_one'), col_names=None, row_names=None):
+    def __init__(self, X, ID, ev = None, groups = ['group_1','group_2'], normalize=('zscore', 'norm_one'), col_names=None, row_names=None):
         """
         X: input variables for a single entity
         ID: ID of the entity; can be a set
@@ -24,6 +26,7 @@ class STATISData(object):
         self.n_var = X.shape[1]
         self.groups = groups
         self.data_std_ = None
+        self.affinity_ = None
 
         if col_names is None:
             self.col_names = ['col_%s' % str(i).zfill(5) for i in range(X.shape[1])]
@@ -36,14 +39,6 @@ class STATISData(object):
             self.row_names = col_names
 
         self.normalize(method=normalize)
-        """
-        if similarity is 'cross_product':
-            self.cross_product()
-        elif similarity is 'covariance':
-            self.covariance()
-        elif similarity is 'double_center':
-            self.double_center()
-        """
 
         if ev is not None:
             self.data_scaled_ = self.data_std_ * self.ev
@@ -71,18 +66,18 @@ class STATISData(object):
 
     def cross_product(self):
 
-        self.crossp_ = self.data_std.dot(self.data_std.T)
+        self.affinity_ = self.data_std_.dot(self.data_std_.T)
 
     def covariance(self):
 
-        self.cov_ = np.cov(self.data_std, rowvar = False)
+        self.affinity_ = np.cov(self.data_std_, rowvar = False)
 
     def double_center(self):
 
-        assert self.data_std.shape[0] == self.data_std.shape[1], "Error: double centering requires a square matrix (correlation or covariance)"
+        assert self.data_std_.shape[0] == self.data_std_.shape[1], "Error: double centering requires a square matrix (correlation or covariance)"
 
-        cmat = np.eye(self.data_std.shape[0]) - np.ones_like(self.data_std) * data_std.shape[0]
-        self.dc_crossp_ = 0.5*cmat.dot(self.data_std.dot(cmat))
+        cmat = np.eye(self.data_std_.shape[0]) - np.ones_like(self.data_std_) * data_std_.shape[0]
+        self.affinity_ = 0.5*cmat.dot(self.data_std_.dot(cmat))
 
 
 class STATIS(object):
@@ -91,6 +86,7 @@ class STATIS(object):
         self.data = None
         self.n_datasets = None
         self.n_observations = None
+        self.inds_ = None
 
         self.A_ = None
         self.M_ = None
@@ -116,12 +112,6 @@ class STATIS(object):
         self.partial_inertia_dat_ = None
         self.contrib_grp_ = None
 
-    def gen_affinity_input(self):
-
-        for d in self.data:
-            d.cross_product()
-
-
     def fit(self, data):
 
         """
@@ -130,14 +120,18 @@ class STATIS(object):
         :param data: List of STATISdata objects
         """
 
-        self.data = data
-        self.n_datasets = len(self.data)
-        self.n_observations = self.data[0].data.shape[0]
+        self.n_datasets = len(data)
+        self.n_observations = data[0].data.shape[0]
+
 
         # Pre-process
-        self.gen_affinity_input()
-        self.get_ids()
-        self.get_groups()
+        #self.gen_affinity_input()
+        self.data = gen_affinity_input(data)
+        #self.get_ids()
+        self.ids_ = get_ids(self.data)
+        #self.get_groups()
+        self.groups_, self.ugroups_, self.n_groupings_ = get_groups(self.data)
+
         self.rv_pca()
         self.get_A()
         self.get_M()
@@ -149,7 +143,7 @@ class STATIS(object):
         # Get indices for each dataset
         self.get_col_indices()
 
-        # Post-processing
+        # Post-core
         self.calc_factor_scores()
         self.calc_partial_factor_scores()
         self.calc_contrib_obs()
@@ -158,32 +152,6 @@ class STATIS(object):
         self.calc_partial_interia_dat()
 
         print("Done!")
-
-    def get_groups(self):
-
-        """
-        Extracts the information about groups membership from the datasets.
-        
-        :return: 
-        """
-
-        self.groups_ = []
-        for g in self.data:
-            self.groups_.append(g.groups)
-        self.groups_ = np.array(self.groups_)
-
-        self.ugroups_ = []
-        for i in range(self.groups_.shape[1]):
-            self.ugroups_.append(np.unique(self.groups_[:, i]))
-
-        self.n_groupings_ = len(self.ugroups_)
-
-    def get_ids(self):
-
-        self.ids_ = []
-
-        for i in self.data:
-            self.ids_.append(i.ID)
 
     def rv_pca(self):
 
@@ -198,7 +166,7 @@ class STATIS(object):
 
         for i in xrange(self.n_datasets):
             for j in xrange(0, self.n_datasets):
-                C[i, j] = np.sum(self.data[i].crossp_ * self.data[j].crossp_)
+                C[i, j] = np.sum(self.data[i].affinity_ * self.data[j].affinity_)
 
         _, u = eigs(C, k=1)
 
@@ -226,8 +194,8 @@ class STATIS(object):
 
         print("Stacking tables...")
 
-        self.X_ = np.concatenate([self.data[i].data_std for i in range(self.n_datasets)], axis=1)
-        self.X_scaled_ = np.concatenate([self.data[i].data_scaled for i in range(self.n_datasets)], axis=1)
+        self.X_ = np.concatenate([self.data[i].data_std_ for i in range(self.n_datasets)], axis=1)
+        self.X_scaled_ = np.concatenate([self.data[i].data_scaled_ for i in range(self.n_datasets)], axis=1)
 
     def get_col_indices(self):
 
@@ -349,3 +317,10 @@ class dualSTATIS(STATIS):
 
         for d in self.data:
             d.covariance()
+
+class COVSTATIS(STATIS):
+
+    def gen_affinity_input(self):
+
+        for d in self.data:
+            d.double_center()
