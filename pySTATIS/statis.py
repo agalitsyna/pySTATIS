@@ -2,15 +2,14 @@
 Python implementation of STATIS
 '''
 
-from __future__ import print_function
+from __future__ import print_function, absolute_import
 
 import numpy as np
 from scipy.stats.mstats import zscore
 
-from core.helpers import gen_affinity_input, get_ids, get_groups
-from core.decomposition import rv_pca, get_A, get_M, stack_tables, gsvd, get_col_indices, aniso_c1
-from core.contrib import calc_factor_scores, calc_partial_factor_scores, calc_contrib_var, calc_contrib_obs, \
-    calc_contrib_dat, calc_partial_interia_dat
+from .contrib import *
+from .decomposition import *
+from .helpers import *
 
 
 class STATISData(object):
@@ -170,7 +169,7 @@ class STATIS(object):
         self.factor_scores_ = calc_factor_scores(self.P_, self.D_)
         self.partial_factor_scores_ = calc_partial_factor_scores(self.X_scaled_, self.Q_, self.col_indices_)
         self.contrib_obs_ = calc_contrib_obs(self.factor_scores_, self.ev_, self.M_, self.D_, self.n_observations,
-                                             self.n_comps_)
+                                                           self.n_comps_)
         self.contrib_var_ = calc_contrib_var(self.X_, self.Q_, self.A_, self.n_comps_)
         self.contrib_dat_ = calc_contrib_dat(self.contrib_var_, self.col_indices_, self.n_datasets, self.n_comps_)
         self.partial_inertia_dat_ = calc_partial_interia_dat(self.contrib_dat_, self.ev_)
@@ -179,10 +178,10 @@ class STATIS(object):
 
     def print_variance_explained(self):
 
-        self.ve_ = np.round(np.power(self.D_, 2) / sum(np.power(self.D_, 2)), 3)
+        self.ve_ = np.round(np.power(self.D_, 2) / sum(np.power(self.D_, 2)), 5)
 
         print("===================================================================")
         print('Component   % var     % cumulative')
         print('===================================================================')
         for i, v in enumerate(self.ve_):
-            print('%s         %.3f     %.3f' % (str(i + 1).zfill(3), v, np.sum(self.ve_[0:i + 1])))
+            print('%s         %.3f     %.3f' % (str(i + 1).zfill(3), v*100, np.sum(self.ve_[0:i + 1])*100))

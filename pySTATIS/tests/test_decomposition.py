@@ -1,8 +1,8 @@
 import numpy as np
 
 from unittest import TestCase
-from pySTATIS.wine_data import get_wine_data
-from pySTATIS.core.decomposition import rv_pca
+from pySTATIS import STATIS, get_wine_data
+from ..decomposition import rv_pca
 
 class TestSTATIS(TestCase):
 
