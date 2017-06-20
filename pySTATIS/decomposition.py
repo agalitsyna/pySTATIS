@@ -146,4 +146,4 @@ def gsvd(X, M, A, n_comps = 30):
 
     print('Done!')
 
-    return P, D, Q, ev, n_comps
+    return P, D, Q, ev
