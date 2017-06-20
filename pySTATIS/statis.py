@@ -86,7 +86,7 @@ class STATISData(object):
                 self.affinity_ = self.hdf5['cross_product'].create_dataset(self.ID, data=aff, compression='gzip')
                 del aff
             else:
-                self.affinity_ = self.hdf5['affinity/cross_product/%s' % self.ID]
+                self.affinity_ = self.hdf5['cross_product/%s' % self.ID]
 
         else:
             self.affinity_ = self.data_std_.dot(self.data_std_.T)
@@ -105,7 +105,7 @@ class STATISData(object):
 
 
 class STATIS(object):
-    def __init__(self, flavor='STATIS'):
+    def __init__(self, flavor='STATIS', n_comps = 30):
         """
         Initialize STATIS object
         :param flavor: Flavor of STATIS ('STATIS', 'ANISOSTATIS_C1', 'dualSTATIS', 'COVSTATIS')
@@ -125,7 +125,7 @@ class STATIS(object):
         self.Q_ = None  # Right singular vectors
         self.D_ = None  # Singular values
 
-        self.n_comps_ = None
+        self.n_comps = n_comps
 
         self.groups_ = None
         self.ugroups_ = None
@@ -162,8 +162,10 @@ class STATIS(object):
             self.data = gen_affinity_input(data, type='double_center')
         elif self.flavor is 'dualSTATIS':
             self.data = gen_affinity_input(data, type='covariance')
-        else:
+        elif self.flavor is 'STATIS':
             self.data = gen_affinity_input(data, type='cross_product')
+        else:
+            self.data = data
 
         self.ids_ = get_ids(self.data)
         self.groups_, self.ugroups_, self.n_groupings_ = get_groups(self.data)
@@ -180,7 +182,7 @@ class STATIS(object):
         self.A_ = get_A(self.data, self.table_weights_, self.n_datasets, self.flavor)
 
         # Decompose
-        self.P_, self.D_, self.Q_, self.ev_, self.n_comps_ = gsvd(self.X_, self.M_, self.A_)
+        self.P_, self.D_, self.Q_, self.ev_ = gsvd(self.X_, self.M_, self.A_, self.n_comps)
 
         # Get indices for each dataset
         self.col_indices_, self.grp_indices_ = get_col_indices(self.data, self.ids_, self.groups_, self.ugroups_)
