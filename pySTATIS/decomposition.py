@@ -1,6 +1,6 @@
 from __future__ import print_function
 import numpy as np
-from scipy.sparse.linalg import eigs
+from scipy.sparse.linalg import eigs, svds
 
 def rv_pca(data, n_datasets):
     """
@@ -110,7 +110,7 @@ def get_col_indices(data, ids, groups, ugroups):
 
     return col_indices, grp_indices
 
-def gsvd(X, M, A):
+def gsvd(X, M, A, n_comps = 30):
     """
     Generalized SVD
 
@@ -127,6 +127,13 @@ def gsvd(X, M, A):
 
     print("GSVD: SVD... ", end='')
     [P_, D, Q_] = np.linalg.svd(Xw, full_matrices=False)
+
+    #P_ = P_[:,np.arange(n_comp-1,-1,-1)]
+    #D = D[np.arange(n_comp-1,-1,-1)]
+    #Q_ = Q_[np.arange(n_comp-1,-1,-1),:]
+    P_ = P_[:,0:n_comps]
+    D = D[0:n_comps]
+    Q_ = Q_[0:n_comps,:]
     print('Done!')
 
     print("GSVD: Factor scores and eigenvalues... ", end='')
@@ -137,7 +144,6 @@ def gsvd(X, M, A):
     Q = np.dot(np.diag(Ap), Q_.T)
     ev = np.power(D, 2)
 
-    n_comps = len(D)
     print('Done!')
 
     return P, D, Q, ev, n_comps
