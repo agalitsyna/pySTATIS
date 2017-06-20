@@ -14,13 +14,14 @@ from .helpers import *
 
 class STATISData(object):
     def __init__(self, X, ID, ev=None, groups=['group_1', 'group_2'], normalize=('zscore', 'norm_one'), col_names=None,
-                 row_names=None):
+                 row_names=None, hdf5=None):
         """
         X: input variables for a single entity
         ID: ID of the entity; can be a set
         ev: eigenvalues of the X columns, in case that X are principal components
         col_names, row_names: labels for rows and columns
         normalize: normalization method to use (None, 'zscore', 'double_center')
+        hdf5: reference to hdf5 file
         """
 
         self.data = X
@@ -30,6 +31,7 @@ class STATISData(object):
         self.groups = groups
         self.data_std_ = None
         self.affinity_ = None
+        self.hdf5 = hdf5
 
         if col_names is None:
             self.col_names = ['col_%s' % str(i).zfill(5) for i in range(X.shape[1])]
@@ -47,6 +49,12 @@ class STATISData(object):
             self.data_scaled_ = self.data_std_ * self.ev
         else:
             self.data_scaled_ = self.data_std_
+
+        if hdf5 is not None:
+            if 'affinity' not in hdf5.keys():
+                self.hdf5.create_group('affinity')
+            else:
+                self.hdf5 = hdf5['affinity']
 
     def normalize(self, method=None):
 
@@ -69,7 +77,19 @@ class STATISData(object):
 
     def cross_product(self):
 
-        self.affinity_ = self.data_std_.dot(self.data_std_.T)
+        if self.hdf5 is not None:
+            if 'cross_product' not in self.hdf5:
+                self.hdf5.create_group('cross_product')
+
+            if self.ID not in self.hdf5['cross_product'].keys():
+                aff = self.data_std_.dot(self.data_std_.T)
+                self.affinity_ = self.hdf5['cross_product'].create_dataset(self.ID, data=aff, compression='gzip')
+                del aff
+            else:
+                self.affinity_ = self.hdf5['affinity/cross_product/%s' % self.ID]
+
+        else:
+            self.affinity_ = self.data_std_.dot(self.data_std_.T)
 
     def covariance(self):
 
@@ -169,7 +189,7 @@ class STATIS(object):
         self.factor_scores_ = calc_factor_scores(self.P_, self.D_)
         self.partial_factor_scores_ = calc_partial_factor_scores(self.X_scaled_, self.Q_, self.col_indices_)
         self.contrib_obs_ = calc_contrib_obs(self.factor_scores_, self.ev_, self.M_, self.D_, self.n_observations,
-                                                           self.n_comps_)
+                                             self.n_comps_)
         self.contrib_var_ = calc_contrib_var(self.X_, self.Q_, self.A_, self.n_comps_)
         self.contrib_dat_ = calc_contrib_dat(self.contrib_var_, self.col_indices_, self.n_datasets, self.n_comps_)
         self.partial_inertia_dat_ = calc_partial_interia_dat(self.contrib_dat_, self.ev_)
@@ -184,4 +204,4 @@ class STATIS(object):
         print('Component   % var     % cumulative')
         print('===================================================================')
         for i, v in enumerate(self.ve_):
-            print('%s         %.3f     %.3f' % (str(i + 1).zfill(3), v*100, np.sum(self.ve_[0:i + 1])*100))
+            print('%s         %.3f     %.3f' % (str(i + 1).zfill(3), v * 100, np.sum(self.ve_[0:i + 1]) * 100))
