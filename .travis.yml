@@ -4,6 +4,22 @@ python:
 - 3.4
 - 3.5
 - 3.6
+env:
+- INSTALL_SKLEARN=true
+before_install:
+- function conda_inst {
+  export CONDA_HOME=$HOME/conda &&
+  wget https://repo.continuum.io/miniconda/Miniconda${TRAVIS_PYTHON_VERSION:0:1}-latest-Linux-x86_64.sh
+    -O /home/travis/.cache/conda.sh &&
+  bash /home/travis/.cache/conda.sh -b -p ${CONDA_HOME} &&
+  export PATH=${CONDA_HOME}/bin:$PATH &&
+  hash -r &&
+  conda config --set always_yes yes --set changeps1 no &&
+  conda update -q conda &&
+  conda config --add channels conda-forge &&
+  conda install python=${TRAVIS_PYTHON_VERSION} numpy scipy nomkl pytest &&
+  if $INSTALL_SKLEARN; then conda install scikit-learn; fi }
+- travis_retry conda_inst
 install:
 - travis_retry pip install -e .
 script:
