@@ -157,6 +157,10 @@ class STATIS(object):
         self.n_datasets = len(data)
         self.n_observations = data[0].data.shape[0]
 
+        if self.n_observations <= self.n_comps:
+            print("WARNING: You requested more components than observations. Decreasing the number of components.")
+            self.n_comps = self.n_observations
+
         # Pre-process
         if self.flavor is 'COVSTATIS':
             self.data = gen_affinity_input(data, type='double_center')

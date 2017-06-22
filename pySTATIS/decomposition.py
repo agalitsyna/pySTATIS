@@ -110,7 +110,7 @@ def get_col_indices(data, ids, groups, ugroups):
 
     return col_indices, grp_indices
 
-def gsvd(X, M, A, n_comps = 30):
+def gsvd(X, M, A, n_comps = 10):
     """
     Generalized SVD
 
