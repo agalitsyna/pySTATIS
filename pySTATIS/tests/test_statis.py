@@ -6,6 +6,9 @@ from ..decomposition import rv_pca
 
 def test_RvPCA():
     data = get_wine_data()
+    for d in data:
+        d.cross_product()
+
     n_datasets = len(data)
 
     expected_output = np.array([[0.10360263],
