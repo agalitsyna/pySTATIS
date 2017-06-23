@@ -21,6 +21,7 @@ before_install:
   if $INSTALL_SKLEARN; then conda install scikit-learn; fi }
 - travis_retry conda_inst
 install:
-- travis_retry pip install -e .
+- pip install .
+- pip install -r requirements.txt
 script:
 - py.test -v --doctest-modules pySTATIS
