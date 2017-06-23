@@ -93,7 +93,7 @@ class STATISData(object):
 
     def covariance(self):
 
-        self.affinity_ = np.cov(self.data_std_, rowvar=False)
+        self.affinity_ = np.cov(self.data_std_, rowvar=True)
 
     def double_center(self):
 

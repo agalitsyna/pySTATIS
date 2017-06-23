@@ -103,7 +103,7 @@ def get_col_indices(data, ids, groups, ugroups):
     for i, ug in enumerate(ugroups):
         ginds = []
         for g in ug:
-            ginds.append(np.concatenate(map(col_indices.__getitem__, np.where(groups[:, i] == g)[0])))
+            ginds.append(np.concatenate(list(map(col_indices.__getitem__, np.where(groups[:, i] == g)[0]))))
         grp_indices.append(ginds)
 
     print('Done!')
