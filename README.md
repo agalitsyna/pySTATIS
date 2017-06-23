@@ -1,5 +1,7 @@
 # pySTATIS
 
+[![Build Status](https://travis-ci.org/mfalkiewicz/pySTATIS.svg?branch=master)](https://travis-ci.org/mfalkiewicz/pySTATIS)
+
 Python implementation of STATIS - a multi-table version of Principal Component Analysis (PCA)
 
 ## About
