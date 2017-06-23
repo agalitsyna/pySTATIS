@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import numpy as np
 
 from .. import get_wine_data
@@ -13,8 +15,8 @@ def test_RvPCA():
 
     expected_output = np.array([[0.10360263],
                                 [0.10363524],
-                                [0.10370834],
                                 [0.09208477],
+                                [0.10370834],
                                 [0.08063234],
                                 [0.09907428],
                                 [0.09353886],
@@ -23,4 +25,6 @@ def test_RvPCA():
                                 [0.12381833]])
     output = rv_pca(data, n_datasets)
 
-    assert np.allclose(output, expected_output)
+    print(output)
+
+    np.testing.assert_array_almost_equal(output, expected_output)
