@@ -21,5 +21,6 @@ def test_RvPCA():
                                 [0.08881811],
                                 [0.1110871],
                                 [0.12381833]])
+    output = rv_pca(data, n_datasets)
 
-    assert np.allclose(rv_pca(data, n_datasets), expected_output)
+    assert np.allclose(output, expected_output)

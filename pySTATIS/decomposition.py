@@ -1,6 +1,6 @@
 from __future__ import print_function
 import numpy as np
-from scipy.sparse.linalg import eigs, svds
+from scipy.sparse.linalg import eigs
 
 def rv_pca(data, n_datasets):
     """
