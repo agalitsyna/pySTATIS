@@ -253,6 +253,10 @@ class ANISOSTATIS(STATIS):
         self.table_weights_, self.weights_ev_ = aniso_c1(self.X_, self.M_)
         self.A_ = get_A_ANISOSTATIS(self.table_weights_)
 
+    def add_suptable(self, Xsup):
+
+        print("Supplementary tables for ANISOSTATIS not yet supported")
+
 class COVSTATIS(STATIS):
     def __repr__(self):
         return "COVSTATIS"
@@ -263,6 +267,10 @@ class COVSTATIS(STATIS):
         self.n_datasets = len(self.data)
         self.X_, self.X_scaled_ = stack_tables(self.data, self.n_datasets)
 
+    def add_suptable(self, Xsup):
+
+        print("Supplementary tables for COVSTATIS not yet supported")
+
 class dualSTATIS(STATIS):
     def __repr__(self):
         return "dualSTATIS"
@@ -272,3 +280,7 @@ class dualSTATIS(STATIS):
 
         self.n_datasets = len(self.data)
         self.X_, self.X_scaled_ = stack_tables(self.data, self.n_datasets)
+
+    def add_suptable(self, Xsup):
+
+        print("Supplementary tables for dualSTATIS not yet supported")
