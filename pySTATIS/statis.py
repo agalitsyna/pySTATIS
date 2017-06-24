@@ -10,7 +10,7 @@ from scipy.stats.mstats import zscore
 from .contrib import *
 from .decomposition import *
 from .helpers import *
-from .supplementary import add_suptable
+from .supplementary import add_suptable_STATIS
 
 
 class STATISData(object):
@@ -219,7 +219,7 @@ class STATIS(object):
 
         gen_affinity_input(Xsup)
         for i, d in enumerate(Xsup):
-            QSup, FSup, GSup, ASup = add_suptable(d, self.data, self.P_, self.D_, self.M_, self.inner_u_,
+            QSup, FSup, GSup, ASup = add_suptable_STATIS(d, self.data, self.P_, self.D_, self.M_, self.inner_u_,
                                                   self.weights_ev_, self.n_datasets)
             self.QSup_.append(QSup)
             self.FSup_.append(FSup)
