@@ -144,6 +144,11 @@ class STATIS(object):
 
         self.ve_ = None
 
+        self.QSup_ = []
+        self.FSup_ = []
+        self.GSup_ = []
+        self.ASup_ = []
+
     def fit(self, data):
 
         """
@@ -209,11 +214,7 @@ class STATIS(object):
             Xsup = [Xsup]
 
         if self.flavor is 'STATIS':
-            self.QSup_ = []
-            self.FSup_ = []
-            self.GSup_ = []
-            self.ASup_ = []
-            
+
             for i, d in enumerate(Xsup):
                 QSup, FSup, GSup, ASup = add_suptable(d, self.data, self.P_, self.D_, self.M_, self.inner_u_,
                                                       self.weights_ev_, self.n_datasets)
