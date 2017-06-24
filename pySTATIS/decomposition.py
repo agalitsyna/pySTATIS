@@ -45,22 +45,21 @@ def aniso_c1(X, M):
     print('Done!')
     return Mn, ev
 
-def get_A(data, table_weights, n_datasets, flavor):
+def get_A_STATIS(data, table_weights, n_datasets):
     """
     Dataset masses.
 
     """
 
     print("Dataset/variable masses... ", end='')
-    if flavor is 'STATIS':
-        a = np.concatenate([np.repeat(table_weights[i], data[i].n_var) for i in range(n_datasets)])
-    elif 'ANISOSTATIS' in flavor:
-        a = table_weights
-    else:
-        raise ValueError('You specified a non-existing STATIS flavor!')
-    print("Done!")
+    a = np.concatenate([np.repeat(table_weights[i], data[i].n_var) for i in range(n_datasets)])
 
     return np.diag(a)
+
+def get_A_ANISOSTATIS(table_weights):
+
+    return np.diag(table_weights)
+
 
 def get_M(n_obs):
     """
