@@ -185,7 +185,7 @@ class STATIS(object):
         self.X_, self.X_scaled_ = stack_tables(self.data, self.n_datasets)
 
         if self.flavor is 'ANISOSTATIS_C1':
-            self.table_weights_, self.weights_ev_, self.inner_u_ = aniso_c1(self.X_, self.M_)
+            self.table_weights_, self.weights_ev_ = aniso_c1(self.X_, self.M_)
         else:
             self.table_weights_, self.weights_ev_, self.inner_u_ = rv_pca(self.data, self.n_datasets)
 
