@@ -20,13 +20,13 @@ def rv_pca(data, n_datasets):
     print('Done!')
 
     print("Rv-PCA: Decomposing the inner product matrix... ", end ='')
-    _, u = eigs(C, k=1)
+    e, u = eigs(C, k=8)
     print("Done!")
-    weights = np.real(u) / np.sum(np.real(u))
+    weights = (np.real(u[:,0]) / np.sum(np.real(u[:,0]))).flatten()
 
     print("Rv-PCA: Done!")
 
-    return weights
+    return weights, np.real(e), np.real(u)
 
 def aniso_c1(X, M):
     """
@@ -38,12 +38,12 @@ def aniso_c1(X, M):
     print("Computing ANISOSTATIS Criterion 1 weights...", end='')
 
     C = np.power(X.T.dot(M.dot(X)), 2)
-    _, Mn = eigs(C, k=1)
+    ev, Mn = eigs(C, k=1)
     Mn = np.real(Mn)
     Mn = np.concatenate(Mn / np.sum(Mn))
 
     print('Done!')
-    return Mn
+    return Mn, ev
 
 def get_A(data, table_weights, n_datasets, flavor):
     """
@@ -59,6 +59,7 @@ def get_A(data, table_weights, n_datasets, flavor):
     else:
         raise ValueError('You specified a non-existing STATIS flavor!')
     print("Done!")
+
     return np.diag(a)
 
 def get_M(n_obs):

@@ -26,9 +26,9 @@ def test_RvPCA():
                                 [0.08881811],
                                 [0.1110871],
                                 [0.12381833]])
-    output = rv_pca(data, n_datasets)
+    output, _, _ = rv_pca(data, n_datasets)
 
-    np.testing.assert_array_almost_equal(output, expected_output)
+    np.testing.assert_array_almost_equal(np.atleast_2d(output).T, expected_output)
 
 
 def test_getM():
@@ -177,7 +177,7 @@ def test_aniso_c1():
                                 0.02827519, 0.02965729, 0.02865608])
 
     X, _ = stack_tables(data, 10)
-    output = aniso_c1(X, M)
+    output, _ = aniso_c1(X, M)
 
     np.testing.assert_almost_equal(output, expected_output)
 
@@ -236,9 +236,9 @@ def test_gsvd():
     M = get_M(n_obs)
     X_, _ = stack_tables(X, 10)
 
-    table_weights = aniso_c1(X_, M)
+    table_weights, _ = aniso_c1(X_, M)
 
-    A = get_A(X_, table_weights, 10, 'ANISOSTATIS_C1')
+    A = get_A(X_, table_weights, 10, 'ANISOSTATIS')
 
     expected_P = np.array([[-1.12532966, 0.55340946],
                            [-0.87937021, 0.09247991],
@@ -415,8 +415,8 @@ def test_factor_scores():
     n_obs = X[0].data.shape[0]
     M = get_M(n_obs)
     X_, _ = stack_tables(X, 10)
-    table_weights = aniso_c1(X_, M)
-    A = get_A(X_, table_weights, 10, 'ANISOSTATIS_C1')
+    table_weights, _ = aniso_c1(X_, M)
+    A = get_A(X_, table_weights, 10, 'ANISOSTATIS')
     P_, D_, _, _ = gsvd(X_, M, A, 10)
 
     expected_fs = np.array([[-0.11872877, 0.02190188, -0.00030441, -0.02212128, 0.00111479,
@@ -454,8 +454,8 @@ def test_contrib_obs():
     n_obs = X[0].data.shape[0]
     M = get_M(n_obs)
     X_, _ = stack_tables(X, 10)
-    table_weights = aniso_c1(X_, M)
-    A = get_A(X_, table_weights, 10, 'ANISOSTATIS_C1')
+    table_weights, _ = aniso_c1(X_, M)
+    A = get_A(X_, table_weights, 10, 'ANISOSTATIS')
     P_, D_, Q_, ev_ = gsvd(X_, M, A, 10)
 
     fs = calc_factor_scores(P_, D_)
@@ -519,7 +519,7 @@ def test_contrib_var():
     n_obs = X[0].data.shape[0]
     M = get_M(n_obs)
     X_, _ = stack_tables(X, 10)
-    table_weights = aniso_c1(X_, M)
+    table_weights, _ = aniso_c1(X_, M)
     A = get_A(X_, table_weights, 10, 'ANISOSTATIS_C1')
     P_, D_, Q_, _ = gsvd(X_, M, A, 10)
 
@@ -746,7 +746,7 @@ def test_contrib_dat():
     n_obs = X[0].data.shape[0]
     M = get_M(n_obs)
     X_, _ = stack_tables(X, 10)
-    table_weights = aniso_c1(X_, M)
+    table_weights, _ = aniso_c1(X_, M)
     A = get_A(X_, table_weights, 10, 'ANISOSTATIS_C1')
     P_, D_, Q_, ev_ = gsvd(X_, M, A, 10)
 
@@ -788,7 +788,7 @@ def test_partial_inertia():
     n_obs = X[0].data.shape[0]
     M = get_M(n_obs)
     X_, _ = stack_tables(X, 10)
-    table_weights = aniso_c1(X_, M)
+    table_weights, _ = aniso_c1(X_, M)
     A = get_A(X_, table_weights, 10, 'ANISOSTATIS_C1')
     P_, D_, Q_, ev_ = gsvd(X_, M, A, 10)
 
@@ -851,7 +851,7 @@ def test_partial_factor_scores():
     n_obs = X[0].data.shape[0]
     M = get_M(n_obs)
     X_, X_scaled_ = stack_tables(X, 10)
-    table_weights = aniso_c1(X_, M)
+    table_weights, _ = aniso_c1(X_, M)
     A = get_A(X_, table_weights, 10, 'ANISOSTATIS_C1')
     P_, D_, Q_, ev_ = gsvd(X_, M, A, 10)
 

@@ -10,6 +10,7 @@ from scipy.stats.mstats import zscore
 from .contrib import *
 from .decomposition import *
 from .helpers import *
+from .supplementary import add_suptable
 
 
 class STATISData(object):
@@ -105,7 +106,7 @@ class STATISData(object):
 
 
 class STATIS(object):
-    def __init__(self, flavor='STATIS', n_comps = 30):
+    def __init__(self, flavor='STATIS', n_comps=30):
         """
         Initialize STATIS object
         :param flavor: Flavor of STATIS ('STATIS', 'ANISOSTATIS_C1', 'dualSTATIS', 'COVSTATIS')
@@ -143,6 +144,11 @@ class STATIS(object):
 
         self.ve_ = None
 
+        self.QSup_ = []
+        self.FSup_ = []
+        self.GSup_ = []
+        self.ASup_ = []
+
     def fit(self, data):
 
         """
@@ -179,9 +185,9 @@ class STATIS(object):
         self.X_, self.X_scaled_ = stack_tables(self.data, self.n_datasets)
 
         if self.flavor is 'ANISOSTATIS_C1':
-            self.table_weights_ = aniso_c1(self.X_, self.M_)
+            self.table_weights_, self.weights_ev_ = aniso_c1(self.X_, self.M_)
         else:
-            self.table_weights_ = rv_pca(self.data, self.n_datasets)
+            self.table_weights_, self.weights_ev_, self.inner_u_ = rv_pca(self.data, self.n_datasets)
 
         self.A_ = get_A(self.data, self.table_weights_, self.n_datasets, self.flavor)
 
@@ -201,6 +207,24 @@ class STATIS(object):
         self.partial_inertia_dat_ = calc_partial_interia_dat(self.contrib_dat_, self.ev_)
 
         print('STATIS finished successfully in %.3f seconds' % (time.time() - t0))
+
+    def add_table(self, Xsup):
+
+        if type(Xsup) is not list:
+            Xsup = [Xsup]
+
+        if self.flavor is 'STATIS':
+            gen_affinity_input(Xsup)
+            for i, d in enumerate(Xsup):
+                QSup, FSup, GSup, ASup = add_suptable(d, self.data, self.P_, self.D_, self.M_, self.inner_u_,
+                                                      self.weights_ev_, self.n_datasets)
+                self.QSup_.append(QSup)
+                self.FSup_.append(FSup)
+                self.GSup_.append(GSup)
+                self.ASup_.append(ASup)
+
+        else:
+            print("Adding supplementary tables for flavor %s is not yet supported" % self.flavor)
 
     def print_variance_explained(self):
 
