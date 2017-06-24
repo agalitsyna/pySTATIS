@@ -57,6 +57,9 @@ class STATISData(object):
             else:
                 self.hdf5 = hdf5['affinity']
 
+    def __repr__(self):
+        return "STATISData (%s)" % self.ID
+
     def normalize(self, method=None):
 
         if method is 'None':
@@ -106,7 +109,7 @@ class STATISData(object):
 
 
 class STATIS(object):
-    def __init__(self, flavor='STATIS', n_comps=30):
+    def __init__(self, n_comps=30):
         """
         Initialize STATIS object
         :param flavor: Flavor of STATIS ('STATIS', 'ANISOSTATIS_C1', 'dualSTATIS', 'COVSTATIS')
@@ -116,7 +119,6 @@ class STATIS(object):
         self.n_datasets = None
         self.n_observations = None
         self.inds_ = None
-        self.flavor = flavor
 
         self.A_ = None
         self.M_ = None
@@ -149,6 +151,47 @@ class STATIS(object):
         self.GSup_ = []
         self.ASup_ = []
 
+    def __repr__(self):
+        return "STATIS"
+
+    def _get_dataset_info(self):
+
+        self.n_observations = self.data[0].data.shape[0]
+
+        if self.n_observations <= self.n_comps:
+            print("WARNING: You requested more components than observations. Decreasing the number of components.")
+            self.n_comps = self.n_observations
+
+        self.ids_ = get_ids(self.data)
+        self.groups_, self.ugroups_, self.n_groupings_ = get_groups(self.data)
+        self.col_indices_, self.grp_indices_ = get_col_indices(self.data, self.ids_, self.groups_, self.ugroups_)
+
+    def _preprocess(self, data):
+
+        self.data = gen_affinity_input(data, type='cross_product')
+        self.n_datasets = len(self.data)
+        self.X_, self.X_scaled_ = stack_tables(self.data, self.n_datasets)
+
+    def _get_masses(self):
+
+        self.M_ = get_M(self.n_observations)
+        self.table_weights_, self.weights_ev_, self.inner_u_ = rv_pca(self.data, self.n_datasets)
+        self.A_ = get_A_STATIS(self.data, self.table_weights_, self.n_datasets)
+
+    def _decompose(self):
+
+        self.P_, self.D_, self.Q_, self.ev_ = gsvd(self.X_, self.M_, self.A_, self.n_comps)
+
+    def _get_contributions(self):
+
+        self.factor_scores_ = calc_factor_scores(self.P_, self.D_)
+        self.partial_factor_scores_ = calc_partial_factor_scores(self.X_scaled_, self.Q_, self.col_indices_)
+        self.contrib_obs_ = calc_contrib_obs(self.factor_scores_, self.ev_, self.M_, self.D_, self.n_observations,
+                                             self.n_comps)
+        self.contrib_var_ = calc_contrib_var(self.X_, self.Q_, self.A_, self.n_comps)
+        self.contrib_dat_ = calc_contrib_dat(self.contrib_var_, self.col_indices_, self.n_datasets, self.n_comps)
+        self.partial_inertia_dat_ = calc_partial_interia_dat(self.contrib_dat_, self.ev_)
+
     def fit(self, data):
 
         """
@@ -160,71 +203,29 @@ class STATIS(object):
         import time
 
         t0 = time.time()
-        self.n_datasets = len(data)
-        self.n_observations = data[0].data.shape[0]
 
-        if self.n_observations <= self.n_comps:
-            print("WARNING: You requested more components than observations. Decreasing the number of components.")
-            self.n_comps = self.n_observations
-
-        # Pre-process
-        if self.flavor is 'COVSTATIS':
-            self.data = gen_affinity_input(data, type='double_center')
-        elif self.flavor is 'dualSTATIS':
-            self.data = gen_affinity_input(data, type='covariance')
-        elif self.flavor is 'STATIS':
-            self.data = gen_affinity_input(data, type='cross_product')
-        else:
-            self.data = data
-
-        self.ids_ = get_ids(self.data)
-        self.groups_, self.ugroups_, self.n_groupings_ = get_groups(self.data)
-
-        # Get weights and prepare for GSVD
-        self.M_ = get_M(self.n_observations)
-        self.X_, self.X_scaled_ = stack_tables(self.data, self.n_datasets)
-
-        if self.flavor is 'ANISOSTATIS_C1':
-            self.table_weights_, self.weights_ev_ = aniso_c1(self.X_, self.M_)
-        else:
-            self.table_weights_, self.weights_ev_, self.inner_u_ = rv_pca(self.data, self.n_datasets)
-
-        self.A_ = get_A(self.data, self.table_weights_, self.n_datasets, self.flavor)
-
-        # Decompose
-        self.P_, self.D_, self.Q_, self.ev_ = gsvd(self.X_, self.M_, self.A_, self.n_comps)
-
-        # Get indices for each dataset
-        self.col_indices_, self.grp_indices_ = get_col_indices(self.data, self.ids_, self.groups_, self.ugroups_)
-
-        # Post-process
-        self.factor_scores_ = calc_factor_scores(self.P_, self.D_)
-        self.partial_factor_scores_ = calc_partial_factor_scores(self.X_scaled_, self.Q_, self.col_indices_)
-        self.contrib_obs_ = calc_contrib_obs(self.factor_scores_, self.ev_, self.M_, self.D_, self.n_observations,
-                                             self.n_comps)
-        self.contrib_var_ = calc_contrib_var(self.X_, self.Q_, self.A_, self.n_comps)
-        self.contrib_dat_ = calc_contrib_dat(self.contrib_var_, self.col_indices_, self.n_datasets, self.n_comps)
-        self.partial_inertia_dat_ = calc_partial_interia_dat(self.contrib_dat_, self.ev_)
+        self._preprocess(data)
+        self._get_dataset_info()
+        self._get_masses()
+        self._decompose()
+        self._get_contributions()
 
         print('STATIS finished successfully in %.3f seconds' % (time.time() - t0))
 
-    def add_table(self, Xsup):
+    def add_suptable(self, Xsup):
 
         if type(Xsup) is not list:
             Xsup = [Xsup]
 
-        if self.flavor is 'STATIS':
-            gen_affinity_input(Xsup)
-            for i, d in enumerate(Xsup):
-                QSup, FSup, GSup, ASup = add_suptable(d, self.data, self.P_, self.D_, self.M_, self.inner_u_,
-                                                      self.weights_ev_, self.n_datasets)
-                self.QSup_.append(QSup)
-                self.FSup_.append(FSup)
-                self.GSup_.append(GSup)
-                self.ASup_.append(ASup)
+        gen_affinity_input(Xsup)
+        for i, d in enumerate(Xsup):
+            QSup, FSup, GSup, ASup = add_suptable(d, self.data, self.P_, self.D_, self.M_, self.inner_u_,
+                                                  self.weights_ev_, self.n_datasets)
+            self.QSup_.append(QSup)
+            self.FSup_.append(FSup)
+            self.GSup_.append(GSup)
+            self.ASup_.append(ASup)
 
-        else:
-            print("Adding supplementary tables for flavor %s is not yet supported" % self.flavor)
 
     def print_variance_explained(self):
 
@@ -235,3 +236,39 @@ class STATIS(object):
         print('===================================================================')
         for i, v in enumerate(self.ve_):
             print('%s         %.3f     %.3f' % (str(i + 1).zfill(3), v * 100, np.sum(self.ve_[0:i + 1]) * 100))
+
+
+class ANISOSTATIS(STATIS):
+    def __repr__(self):
+        return "ANISOSTATIS"
+
+    def _preprocess(self, data):
+        self.data = data
+
+        self.n_datasets = len(self.data)
+        self.X_, self.X_scaled_ = stack_tables(self.data, self.n_datasets)
+
+    def _get_masses(self):
+        self.M_ = get_M(self.n_observations)
+        self.table_weights_, self.weights_ev_ = aniso_c1(self.X_, self.M_)
+        self.A_ = get_A_ANISOSTATIS(self.table_weights_)
+
+class COVSTATIS(STATIS):
+    def __repr__(self):
+        return "COVSTATIS"
+
+    def _preprocess(self, data):
+        self.data = gen_affinity_input(data, type='double_center')
+
+        self.n_datasets = len(self.data)
+        self.X_, self.X_scaled_ = stack_tables(self.data, self.n_datasets)
+
+class dualSTATIS(STATIS):
+    def __repr__(self):
+        return "dualSTATIS"
+
+    def _preprocess(self, data):
+        self.data = gen_affinity_input(data, type='covariance')
+
+        self.n_datasets = len(self.data)
+        self.X_, self.X_scaled_ = stack_tables(self.data, self.n_datasets)

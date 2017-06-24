@@ -3,7 +3,8 @@ from __future__ import print_function
 import numpy as np
 
 from .. import get_wine_data
-from ..decomposition import rv_pca, get_M, get_A, stack_tables, aniso_c1, get_col_indices, gsvd
+from ..decomposition import rv_pca, get_M, get_A_STATIS, get_A_ANISOSTATIS, stack_tables, aniso_c1, get_col_indices, \
+    gsvd
 from ..helpers import get_groups, get_ids, gen_affinity_input
 from ..contrib import calc_factor_scores, calc_partial_interia_dat, calc_contrib_dat, calc_contrib_var, \
     calc_contrib_obs, calc_partial_factor_scores
@@ -41,7 +42,7 @@ def test_getA_aniso_c1():
     weights = np.arange(10)
     expected_output = np.diag(weights)
 
-    output = get_A(data=None, table_weights=weights, n_datasets=0, flavor='ANISOSTATIS')
+    output = get_A_ANISOSTATIS(table_weights=weights)
 
     np.testing.assert_almost_equal(output, expected_output)
 
@@ -72,7 +73,7 @@ def test_getA_STATIS():
                                         0.1110871, 0.1110871, 0.1110871, 0.1110871, 0.12381833,
                                         0.12381833, 0.12381833, 0.12381833]))
 
-    output = get_A(data=data, table_weights=weights, n_datasets=n_datasets, flavor='STATIS')
+    output = get_A_STATIS(data=data, table_weights=weights, n_datasets=n_datasets)
 
     np.testing.assert_almost_equal(output, expected_output)
 
@@ -238,7 +239,7 @@ def test_gsvd():
 
     table_weights, _ = aniso_c1(X_, M)
 
-    A = get_A(X_, table_weights, 10, 'ANISOSTATIS')
+    A = get_A_ANISOSTATIS(table_weights)
 
     expected_P = np.array([[-1.12532966, 0.55340946],
                            [-0.87937021, 0.09247991],
@@ -416,7 +417,7 @@ def test_factor_scores():
     M = get_M(n_obs)
     X_, _ = stack_tables(X, 10)
     table_weights, _ = aniso_c1(X_, M)
-    A = get_A(X_, table_weights, 10, 'ANISOSTATIS')
+    A = get_A_ANISOSTATIS(table_weights)
     P_, D_, _, _ = gsvd(X_, M, A, 10)
 
     expected_fs = np.array([[-0.11872877, 0.02190188, -0.00030441, -0.02212128, 0.00111479,
@@ -455,7 +456,7 @@ def test_contrib_obs():
     M = get_M(n_obs)
     X_, _ = stack_tables(X, 10)
     table_weights, _ = aniso_c1(X_, M)
-    A = get_A(X_, table_weights, 10, 'ANISOSTATIS')
+    A = get_A_ANISOSTATIS(table_weights)
     P_, D_, Q_, ev_ = gsvd(X_, M, A, 10)
 
     fs = calc_factor_scores(P_, D_)
@@ -520,7 +521,7 @@ def test_contrib_var():
     M = get_M(n_obs)
     X_, _ = stack_tables(X, 10)
     table_weights, _ = aniso_c1(X_, M)
-    A = get_A(X_, table_weights, 10, 'ANISOSTATIS_C1')
+    A = get_A_ANISOSTATIS(table_weights)
     P_, D_, Q_, _ = gsvd(X_, M, A, 10)
 
     expected_contrib_var = np.array([[2.19538677e-02, 2.36238548e-02, 6.77011039e-04,
@@ -747,7 +748,7 @@ def test_contrib_dat():
     M = get_M(n_obs)
     X_, _ = stack_tables(X, 10)
     table_weights, _ = aniso_c1(X_, M)
-    A = get_A(X_, table_weights, 10, 'ANISOSTATIS_C1')
+    A = get_A_ANISOSTATIS(table_weights)
     P_, D_, Q_, ev_ = gsvd(X_, M, A, 10)
 
     ids = get_ids(X)
@@ -789,7 +790,7 @@ def test_partial_inertia():
     M = get_M(n_obs)
     X_, _ = stack_tables(X, 10)
     table_weights, _ = aniso_c1(X_, M)
-    A = get_A(X_, table_weights, 10, 'ANISOSTATIS_C1')
+    A = get_A_ANISOSTATIS(table_weights)
     P_, D_, Q_, ev_ = gsvd(X_, M, A, 10)
 
     ids = get_ids(X)
@@ -799,7 +800,6 @@ def test_partial_inertia():
 
     contrib_var = calc_contrib_var(X_, Q_, A, 10)
     contrib_dat = calc_contrib_dat(contrib_var, col_indices_, 10, 10)
-
 
     expected_output = np.array([[9.61122047e-04, 1.36953555e-04, 9.35707665e-05,
                                  6.11446301e-05, 4.88824960e-05, 2.53180792e-05,
@@ -846,13 +846,14 @@ def test_partial_inertia():
 
     np.testing.assert_almost_equal(partial_inertia_dat, expected_output)
 
+
 def test_partial_factor_scores():
     X = get_wine_data()
     n_obs = X[0].data.shape[0]
     M = get_M(n_obs)
     X_, X_scaled_ = stack_tables(X, 10)
     table_weights, _ = aniso_c1(X_, M)
-    A = get_A(X_, table_weights, 10, 'ANISOSTATIS_C1')
+    A = get_A_ANISOSTATIS(table_weights)
     P_, D_, Q_, ev_ = gsvd(X_, M, A, 10)
 
     ids = get_ids(X)
@@ -860,7 +861,7 @@ def test_partial_factor_scores():
 
     col_indices_, _ = get_col_indices(X, ids, groups, ugroups)
 
-    expected_pfs0 = np.array([[-0.59767953,  0.06612091, -0.03716886,  0.0131305 ,  0.28507455,
+    expected_pfs0 = np.array([[-0.59767953, 0.06612091, -0.03716886, 0.0131305, 0.28507455,
                                -0.27548022, -0.19304251, -0.19327211, 0.02549473, -0.59155622],
                               [-0.67708106, 0.32103911, -0.260947, -0.25677363, 0.48148887,
                                -0.01916955, -0.78826034, 0.1302825, 0.08347781, -0.66782885],
@@ -887,4 +888,4 @@ def test_partial_factor_scores():
 
     partial_factor_scores = calc_partial_factor_scores(X_scaled_, Q_, col_indices_)
 
-    np.testing.assert_almost_equal(partial_factor_scores[0,:,:], expected_pfs0)
+    np.testing.assert_almost_equal(partial_factor_scores[0, :, :], expected_pfs0)
