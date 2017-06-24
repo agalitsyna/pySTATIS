@@ -214,11 +214,11 @@ class STATIS(object):
             Xsup = [Xsup]
 
         if self.flavor is 'STATIS':
-
+            gen_affinity_input(Xsup)
             for i, d in enumerate(Xsup):
                 QSup, FSup, GSup, ASup = add_suptable(d, self.data, self.P_, self.D_, self.M_, self.inner_u_,
                                                       self.weights_ev_, self.n_datasets)
-                self.QSup_.append(Qsup)
+                self.QSup_.append(QSup)
                 self.FSup_.append(FSup)
                 self.GSup_.append(GSup)
                 self.ASup_.append(ASup)
