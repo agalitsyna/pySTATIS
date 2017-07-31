@@ -75,7 +75,7 @@ class STATISData(object):
                     temp = temp / np.linalg.norm(temp)
 
                 else:
-                    print("Method not implemented, use 'zscore' and/or 'double_center'")
+                    print("Method '%s' not implemented, use 'zscore' and/or 'double_center'" % m)
 
                 self.data_std_ = temp
 
