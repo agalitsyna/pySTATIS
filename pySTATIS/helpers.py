@@ -1,6 +1,6 @@
 from __future__ import print_function
 
-def gen_affinity_input(data, type = 'cross_product'):
+def gen_affinity_input(data, type = 'cross_product', H = None):
     """
     Apply the transformation to affinity matrix in the input data. This depends on the type of STATIS used.
 
@@ -19,6 +19,9 @@ def gen_affinity_input(data, type = 'cross_product'):
                 d.covariance()
             elif type is 'double_center':
                 d.double_center()
+            elif type is 'ext_cross_product' and H is not None:
+                d.ext_cross_product()
+
             print("Done.")
         else:
             print("Affinity matrix already exists.")

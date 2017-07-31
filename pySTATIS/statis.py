@@ -4,7 +4,6 @@ Python implementation of STATIS
 
 from __future__ import print_function, absolute_import
 
-import numpy as np
 from scipy.stats.mstats import zscore
 
 from .contrib import *
@@ -15,7 +14,7 @@ from .supplementary import add_suptable_STATIS
 
 class STATISData(object):
     def __init__(self, X, ID, ev=None, groups=['group_1', 'group_2'], normalize=('zscore', 'norm_one'), col_names=None,
-                 row_names=None, hdf5=None):
+                 row_names=None, hdf5=None, H=None):
         """
         X: input variables for a single entity
         ID: ID of the entity; can be a set
@@ -33,6 +32,7 @@ class STATISData(object):
         self.data_std_ = None
         self.affinity_ = None
         self.hdf5 = hdf5
+        self.ext_affinity_ = None
 
         if col_names is None:
             self.col_names = ['col_%s' % str(i).zfill(5) for i in range(X.shape[1])]
@@ -107,14 +107,24 @@ class STATISData(object):
         cmat = np.eye(self.data_std_.shape[0]) - np.ones_like(self.data_std_) * data_std_.shape[0]
         self.affinity_ = 0.5 * cmat.dot(self.data_std_.dot(cmat))
 
+    def ext_cross_product(self, H):
+
+        self.affinity_ = H.T.dot(self.data_std_.dot(self.data_std_.T.dot(H)))
+
 
 class STATIS(object):
     def __init__(self, n_comps=30):
         """
         Initialize STATIS object
-        :param flavor: Flavor of STATIS ('STATIS', 'ANISOSTATIS_C1', 'dualSTATIS', 'COVSTATIS')
+        :param n_comps: Number of consensus components to save
         """
 
+        self._init_fields(self, n_comps)
+
+    def __repr__(self):
+        return "STATIS"
+
+    def _init_fields(self, n_comps):
         self.data = None
         self.n_datasets = None
         self.n_observations = None
@@ -151,10 +161,13 @@ class STATIS(object):
         self.GSup_ = []
         self.ASup_ = []
 
-    def __repr__(self):
-        return "STATIS"
-
     def _get_dataset_info(self):
+
+        """
+        Extract simple information about input dataset
+
+        :return:
+        """
 
         self.n_observations = self.data[0].data.shape[0]
 
@@ -168,11 +181,24 @@ class STATIS(object):
 
     def _preprocess(self, data):
 
+        """
+        Preprocess the input data
+
+        :param data: List of STATISData objects
+        :return:
+        """
+
         self.data = gen_affinity_input(data, type='cross_product')
         self.n_datasets = len(self.data)
         self.X_, self.X_scaled_ = stack_tables(self.data, self.n_datasets)
 
     def _get_masses(self):
+
+        """
+        Get masses for observations and variables - the heart of STATIS.
+
+        :return:
+        """
 
         self.M_ = get_M(self.n_observations)
         self.table_weights_, self.weights_ev_, self.inner_u_ = rv_pca(self.data, self.n_datasets)
@@ -180,9 +206,21 @@ class STATIS(object):
 
     def _decompose(self):
 
+        """
+        Generalized SVD.
+
+        :return:
+        """
+
         self.P_, self.D_, self.Q_, self.ev_ = gsvd(self.X_, self.M_, self.A_, self.n_comps)
 
     def _get_contributions(self):
+
+        """
+        Contributions of observations, variables and tables to the compromise.
+
+        :return:
+        """
 
         self.factor_scores_ = calc_factor_scores(self.P_, self.D_)
         self.partial_factor_scores_ = calc_partial_factor_scores(self.X_scaled_, self.Q_, self.col_indices_)
@@ -220,12 +258,11 @@ class STATIS(object):
         gen_affinity_input(Xsup)
         for i, d in enumerate(Xsup):
             QSup, FSup, GSup, ASup = add_suptable_STATIS(d, self.data, self.P_, self.D_, self.M_, self.inner_u_,
-                                                  self.weights_ev_, self.n_datasets)
+                                                         self.weights_ev_, self.n_datasets)
             self.QSup_.append(QSup)
             self.FSup_.append(FSup)
             self.GSup_.append(GSup)
             self.ASup_.append(ASup)
-
 
     def print_variance_explained(self):
 
@@ -254,8 +291,8 @@ class ANISOSTATIS(STATIS):
         self.A_ = get_A_ANISOSTATIS(self.table_weights_)
 
     def add_suptable(self, Xsup):
-
         print("Supplementary tables for ANISOSTATIS not yet supported")
+
 
 class COVSTATIS(STATIS):
     def __repr__(self):
@@ -268,8 +305,8 @@ class COVSTATIS(STATIS):
         self.X_, self.X_scaled_ = stack_tables(self.data, self.n_datasets)
 
     def add_suptable(self, Xsup):
-
         print("Supplementary tables for COVSTATIS not yet supported")
+
 
 class dualSTATIS(STATIS):
     def __repr__(self):
@@ -282,5 +319,21 @@ class dualSTATIS(STATIS):
         self.X_, self.X_scaled_ = stack_tables(self.data, self.n_datasets)
 
     def add_suptable(self, Xsup):
-
         print("Supplementary tables for dualSTATIS not yet supported")
+
+
+class K1STATIS(STATIS):
+    def __init__(self, H = None, n_comps = 30):
+
+        super(K1STATIS, self).__init__(n_comps)
+        assert H is not None, "You need to supply reference table for (K+1) STATIS!"
+        self.H = H
+
+    def __repr__(self):
+        return "(K+1) STATIS"
+
+    def _preprocess(self, data):
+        self.data = gen_affinity_input(data, type='ext_cross_product', H=self.H)
+
+        self.n_datasets = len(self.data)
+        self.X_, self.X_scaled_ = stack_tables(self.data, self.n_datasets)

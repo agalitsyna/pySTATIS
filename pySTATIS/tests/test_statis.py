@@ -889,3 +889,4 @@ def test_partial_factor_scores():
     partial_factor_scores = calc_partial_factor_scores(X_scaled_, Q_, col_indices_)
 
     np.testing.assert_almost_equal(partial_factor_scores[0, :, :], expected_pfs0)
+
