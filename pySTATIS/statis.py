@@ -68,10 +68,10 @@ class STATISData(object):
         else:
             temp = self.data
             for m in method:
-                if m is 'zscore':
+                if m == 'zscore':
                     temp = zscore(temp, axis=0, ddof=1)
 
-                elif m is 'norm_one':
+                elif m == 'norm_one':
                     temp = temp / np.linalg.norm(temp)
 
                 else:
