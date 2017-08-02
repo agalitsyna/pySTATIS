@@ -314,9 +314,9 @@ def test_gsvd():
 
     P_, D_, Q_, ev_ = gsvd(X_, M, A, 2)
 
-    np.testing.assert_almost_equal(P_, expected_P)
+    np.testing.assert_almost_equal(np.abs(P_), np.abs(expected_P))
     np.testing.assert_almost_equal(D_, expected_D)
-    np.testing.assert_almost_equal(Q_, expected_Q)
+    np.testing.assert_almost_equal(np.abs(Q_), np.abs(expected_Q))
     np.testing.assert_almost_equal(ev_, expected_ev)
 
 
@@ -447,7 +447,7 @@ def test_factor_scores():
 
     fs = calc_factor_scores(P_, D_)
 
-    np.testing.assert_almost_equal(fs, expected_fs)
+    np.testing.assert_almost_equal(np.abs(fs), np.abs(expected_fs))
 
 
 def test_contrib_obs():
@@ -888,4 +888,4 @@ def test_partial_factor_scores():
 
     partial_factor_scores = calc_partial_factor_scores(X_scaled_, Q_, col_indices_)
 
-    np.testing.assert_almost_equal(partial_factor_scores[0, :, :], expected_pfs0)
+    np.testing.assert_almost_equal(np.abs(partial_factor_scores[0, :, :]), np.abs(expected_pfs0))
