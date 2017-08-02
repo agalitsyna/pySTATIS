@@ -1,6 +1,8 @@
 from __future__ import print_function
 import numpy as np
 from scipy.sparse.linalg import eigs
+from sklearn.utils.extmath import randomized_svd
+
 
 def rv_pca(data, n_datasets):
     """
@@ -126,11 +128,11 @@ def gsvd(X, M, A, n_comps = 10):
     print("Done!")
 
     print("GSVD: SVD... ", end='')
-    [P_, D, Q_] = np.linalg.svd(Xw, full_matrices=False)
+    [P_, D, Q_] = randomized_svd(Xw, n_comps)
 
-    P_ = P_[:,0:n_comps]
-    D = D[0:n_comps]
-    Q_ = Q_[0:n_comps,:]
+    #P_ = P_[:,0:n_comps]
+    #D = D[0:n_comps]
+    #Q_ = Q_[0:n_comps,:]
     print('Done!')
 
     print("GSVD: Factor scores and eigenvalues... ", end='')
