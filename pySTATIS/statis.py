@@ -180,7 +180,7 @@ class STATIS(object):
 
     def _decompose(self):
 
-        self.P_, self.D_, self.Q_, self.ev_ = gsvd(self.X_, self.M_, self.A_, self.n_comps)
+        self.P_, self.D_, self.Q_, self.ev_ = gsvd(self.X_scaled_, self.M_, self.A_, self.n_comps)
 
     def _get_contributions(self):
 
@@ -188,7 +188,7 @@ class STATIS(object):
         self.partial_factor_scores_ = calc_partial_factor_scores(self.X_scaled_, self.Q_, self.col_indices_)
         self.contrib_obs_ = calc_contrib_obs(self.factor_scores_, self.ev_, self.M_, self.D_, self.n_observations,
                                              self.n_comps)
-        self.contrib_var_ = calc_contrib_var(self.X_, self.Q_, self.A_, self.n_comps)
+        self.contrib_var_ = calc_contrib_var(self.X_scaled_, self.Q_, self.A_, self.n_comps)
         self.contrib_dat_ = calc_contrib_dat(self.contrib_var_, self.col_indices_, self.n_datasets, self.n_comps)
         self.partial_inertia_dat_ = calc_partial_interia_dat(self.contrib_dat_, self.ev_)
 
@@ -250,7 +250,7 @@ class ANISOSTATIS(STATIS):
 
     def _get_masses(self):
         self.M_ = get_M(self.n_observations)
-        self.table_weights_, self.weights_ev_ = aniso_c1(self.X_, self.M_)
+        self.table_weights_, self.weights_ev_ = aniso_c1(self.X_scaled_, self.M_)
         self.A_ = get_A_ANISOSTATIS(self.table_weights_)
 
     def add_suptable(self, Xsup):
