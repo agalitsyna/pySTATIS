@@ -1,5 +1,6 @@
 from __future__ import print_function
 import numpy as np
+from scipy import sparse
 
 
 def calc_factor_scores(P, D):
@@ -14,7 +15,7 @@ def calc_factor_scores(P, D):
     return factor_scores
 
 
-def calc_partial_factor_scores(Xscaled, Q, col_indices):
+def calc_partial_factor_scores(Xscaled, Q, col_indices, mode='sparse'):
     """
     Projects individual scores onto the group-level component.
     """
@@ -23,8 +24,11 @@ def calc_partial_factor_scores(Xscaled, Q, col_indices):
 
     pfs = []
 
-    for i, val in enumerate(col_indices):
-        pfs.append(np.inner(Xscaled[:, val], Q[val, :].T))
+    for i, (X, val) in enumerate(zip(Xscaled, col_indices)):
+        if mode=='sparse':
+            pfs.append(np.inner(X.toarray(), Q[val, :].T))
+        else:
+            pfs.append(np.inner(X, Q[val, :].T))
 
     pfs = np.array(pfs)
 
@@ -33,7 +37,7 @@ def calc_partial_factor_scores(Xscaled, Q, col_indices):
     return pfs
 
 
-def calc_contrib_obs(fs, ev, M, D, n_obs, n_comps):
+def calc_contrib_obs(fs, ev, M, D, n_obs, n_comps, mode='sparse'):
     """
     Contributions of observations (rows of the matrix)
 
@@ -43,9 +47,15 @@ def calc_contrib_obs(fs, ev, M, D, n_obs, n_comps):
 
     contrib_obs = np.zeros([n_obs, len(D)])
 
-    for l in range(n_comps):
-        for i in range(n_obs):
-            contrib_obs[i, l] = M[i, i] * fs[i, l] ** 2 / ev[l]
+    if mode=='sparse':
+        m = M.diagonal(0)
+        for l in range(n_comps):
+            for i in range(n_obs):
+                contrib_obs[i, l] = m[i] * fs[i, l] ** 2 / ev[l]
+    else:
+        for l in range(n_comps):
+            for i in range(n_obs):
+                contrib_obs[i, l] = M[i, i] * fs[i, l] ** 2 / ev[l]
 
     print('Done!')
 
@@ -60,15 +70,16 @@ def calc_contrib_var(X, Q, A, n_comps):
 
     print("Calculating contributions of variables... ", end='')
 
-    contrib_var = np.zeros([X.shape[1], n_comps])
+    cv = (A.diagonal(0) * Q[:, :n_comps].T**2).T
 
-    for l in range(n_comps):
-        for j in range(X.shape[1]):
-            contrib_var[j, l] = A[j, j] * Q[j, l] ** 2
+    # contrib_var = np.zeros([X.shape[1], n_comps])
+    # for l in range(n_comps):
+    #     for j in range(X.shape[1]):
+    #         contrib_var[j, l] = A[j, j] * Q[j, l] ** 2
 
     print('Done!')
 
-    return contrib_var
+    return cv
 
 
 def calc_contrib_dat(contrib_var, col_indices, n_datasets, n_comps):

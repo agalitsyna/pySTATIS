@@ -6,16 +6,20 @@ from __future__ import print_function, absolute_import
 
 import numpy as np
 from scipy.stats.mstats import zscore
+from scipy import sparse
 
 from .contrib import *
 from .decomposition import *
 from .helpers import *
 from .supplementary import add_suptable_STATIS
 
-
 class STATISData(object):
-    def __init__(self, X, ID, ev=None, groups=['group_1', 'group_2'], normalize=('zscore', 'norm_one'), col_names=None,
-                 row_names=None, hdf5=None):
+    def __init__(self, X, ID,
+                 ev=None,
+                 groups=['group_1', 'group_2'],
+                 normalize=('zscore', 'norm_one'),
+                 col_names=None,
+                 row_names=None, hdf5=None, mode='sparse'):
         """
         X: input variables for a single entity
         ID: ID of the entity; can be a set
@@ -25,7 +29,12 @@ class STATISData(object):
         hdf5: reference to hdf5 file
         """
 
-        self.data = X
+        if mode=='sparse':
+            self.data = sparse.csr_matrix(X)
+        else:
+            self.data = X
+
+        self.mode = mode
         self.ev = ev
         self.ID = ID
         self.n_var = X.shape[1]
@@ -66,40 +75,60 @@ class STATISData(object):
             print("Not performing any normalizations")
             self.data_std_ = self.data
         else:
-            temp = self.data
+            data = self.data
             for m in method:
                 if m == 'zscore':
-                    temp = zscore(temp, axis=0, ddof=1)
+                    if self.mode=='sparse':
+                        print('Running non-sparse normalization, might affect productivity:')
+                        data = self.data.toarray()
+                        data = zscore(data, axis=0, ddof=1)
+                    else:
+                        data = zscore(data, axis=0, ddof=1)
 
                 elif m == 'norm_one':
-                    temp = temp / np.linalg.norm(temp)
+                    if self.mode == 'sparse':
+                        data = sparse.csr_matrix( data / np.linalg.norm(data) )
+                    else:
+                        data = data / np.linalg.norm(data)
 
                 else:
                     print("Method '%s' not implemented, use 'zscore' and/or 'double_center'" % m)
 
-                self.data_std_ = temp
+                self.data_std_ = data
 
     def cross_product(self):
-
         if self.hdf5 is not None:
             if 'cross_product' not in self.hdf5:
                 self.hdf5.create_group('cross_product')
 
             if self.ID not in self.hdf5['cross_product'].keys():
-                aff = self.data_std_.dot(self.data_std_.T)
+                if self.mode=='sparse':
+                    aff = self.data_std_.dot(self.data_std_.T).toarray()
+                else:
+                    aff = self.data_std_.dot(self.data_std_.T)
                 self.affinity_ = self.hdf5['cross_product'].create_dataset(self.ID, data=aff, compression='gzip')
                 del aff
             else:
                 self.affinity_ = self.hdf5['cross_product/%s' % self.ID]
 
         else:
-            self.affinity_ = self.data_std_.dot(self.data_std_.T)
+            if self.mode == 'sparse':
+                aff = self.data_std_.dot(self.data_std_.T).toarray()
+            else:
+                aff = self.data_std_.dot(self.data_std_.T)
+            self.affinity_ = aff
 
     def covariance(self):
 
-        self.affinity_ = np.cov(self.data_std_, rowvar=True)
+        if self.mode=='sparse':
+            self.affinity_ = sparse_corrcoef(self.data_std_)
+        else:
+            self.affinity_ = np.cov(self.data_std_, rowvar=True)
 
     def double_center(self):
+
+        if self.mode == "sparse":
+            raise ValueError("Double center is not tested in sparse regime")
 
         assert self.data_std_.shape[0] == self.data_std_.shape[
             1], "Error: double centering requires a square matrix (correlation or covariance)"
@@ -109,13 +138,17 @@ class STATISData(object):
 
 
 class STATIS(object):
-    def __init__(self, n_comps=30):
+    def __init__(self, n_comps=30, mode='sparse', force=False):
         """
-        Initialize STATIS object
-        :param flavor: Flavor of STATIS ('STATIS', 'ANISOSTATIS_C1', 'dualSTATIS', 'COVSTATIS')
+        Initialize STATIS object.
+        mode: str, sparse or dense
+        force: if True, re-calculate all steps even if datasets are already loaded and analyse
+                if False, re-calculates only missing steps
         """
 
         self.data = None
+        self.mode = mode
+        self.force = force
         self.n_datasets = None
         self.n_observations = None
         self.inds_ = None
@@ -152,7 +185,7 @@ class STATIS(object):
         self.ASup_ = []
 
     def __repr__(self):
-        return "STATIS"
+        return f"STATIS on {self.n_datasets} datasets with {self.n_observastions} observations\n  Loaded IDs: {self.ids_}"
 
     def _get_dataset_info(self):
 
@@ -164,32 +197,46 @@ class STATIS(object):
 
         self.ids_ = get_ids(self.data)
         self.groups_, self.ugroups_, self.n_groupings_ = get_groups(self.data)
-        self.col_indices_, self.grp_indices_ = get_col_indices(self.data, self.ids_, self.groups_, self.ugroups_)
+        self.col_indices_, self.grp_indices_ = get_col_indices(self.data, self.ids_, self.groups_, self.ugroups_) # TODO: change
 
     def _preprocess(self, data):
 
-        self.data = gen_affinity_input(data, type='cross_product')
+        self.data = gen_affinity_input(data, type='cross_product', force=self.force)
         self.n_datasets = len(self.data)
-        self.X_, self.X_scaled_ = stack_tables(self.data, self.n_datasets)
+        self.X_, self.X_scaled_ = link_tables(self.data, self.n_datasets) # TODO: check that it does not increase memory
+        # self.X_, self.X_scaled_ = stack_tables(self.data, self.n_datasets, mode=self.mode) # TODO: change
 
     def _get_masses(self):
 
-        self.M_ = get_M(self.n_observations)
+        if not self.A_ is None and not self.force:
+            print("Masses pre-calculated, using existing outputs.")
+            return
+
+        self.M_ = get_M(self.n_observations, mode=self.mode)
         self.table_weights_, self.weights_ev_, self.inner_u_ = rv_pca(self.data, self.n_datasets)
-        self.A_ = get_A_STATIS(self.data, self.table_weights_, self.n_datasets)
+        self.A_ = get_A_STATIS(self.data, self.table_weights_, self.n_datasets, mode=self.mode)
 
     def _decompose(self):
 
-        self.P_, self.D_, self.Q_, self.ev_ = gsvd(self.X_scaled_, self.M_, self.A_, self.n_comps)
+        if not self.P_ is None and not self.force:
+            print("GSVD pre-calculated, using existing outputs.")
+            return
+
+        X_scaled_stack_ = stack_linked_tables(self.X_scaled_, mode=self.mode) # This procedure is needed once for GSVD:
+        self.P_, self.D_, self.Q_, self.ev_ = gsvd(X_scaled_stack_, self.M_, self.A_, self.n_comps, mode=self.mode)
 
     def _get_contributions(self):
 
+        if not self.partial_inertia_dat_ is None and not self.force:
+            print("Contributions pre-calculated, using existing outputs.")
+            return
+
         self.factor_scores_ = calc_factor_scores(self.P_, self.D_)
-        self.partial_factor_scores_ = calc_partial_factor_scores(self.X_scaled_, self.Q_, self.col_indices_)
+        self.partial_factor_scores_ = calc_partial_factor_scores(self.X_scaled_, self.Q_, self.col_indices_, mode=self.mode)
         self.contrib_obs_ = calc_contrib_obs(self.factor_scores_, self.ev_, self.M_, self.D_, self.n_observations,
                                              self.n_comps)
         self.contrib_var_ = calc_contrib_var(self.X_scaled_, self.Q_, self.A_, self.n_comps)
-        self.contrib_dat_ = calc_contrib_dat(self.contrib_var_, self.col_indices_, self.n_datasets, self.n_comps)
+        self.contrib_dat_ = calc_contrib_dat(self.contrib_var_, self.col_indices_,  self.n_datasets, self.n_comps)
         self.partial_inertia_dat_ = calc_partial_interia_dat(self.contrib_dat_, self.ev_)
 
     def fit(self, data):
@@ -238,49 +285,49 @@ class STATIS(object):
             print('%s         %.3f     %.3f' % (str(i + 1).zfill(3), v * 100, np.sum(self.ve_[0:i + 1]) * 100))
 
 
-class ANISOSTATIS(STATIS):
-    def __repr__(self):
-        return "ANISOSTATIS"
-
-    def _preprocess(self, data):
-        self.data = data
-
-        self.n_datasets = len(self.data)
-        self.X_, self.X_scaled_ = stack_tables(self.data, self.n_datasets)
-
-    def _get_masses(self):
-        self.M_ = get_M(self.n_observations)
-        self.table_weights_, self.weights_ev_ = aniso_c1(self.X_scaled_, self.M_)
-        self.A_ = get_A_ANISOSTATIS(self.table_weights_)
-
-    def add_suptable(self, Xsup):
-
-        print("Supplementary tables for ANISOSTATIS not yet supported")
-
-class COVSTATIS(STATIS):
-    def __repr__(self):
-        return "COVSTATIS"
-
-    def _preprocess(self, data):
-        self.data = gen_affinity_input(data, type='double_center')
-
-        self.n_datasets = len(self.data)
-        self.X_, self.X_scaled_ = stack_tables(self.data, self.n_datasets)
-
-    def add_suptable(self, Xsup):
-
-        print("Supplementary tables for COVSTATIS not yet supported")
-
-class dualSTATIS(STATIS):
-    def __repr__(self):
-        return "dualSTATIS"
-
-    def _preprocess(self, data):
-        self.data = gen_affinity_input(data, type='covariance')
-
-        self.n_datasets = len(self.data)
-        self.X_, self.X_scaled_ = stack_tables(self.data, self.n_datasets)
-
-    def add_suptable(self, Xsup):
-
-        print("Supplementary tables for dualSTATIS not yet supported")
+# class ANISOSTATIS(STATIS):
+#     def __repr__(self):
+#         return "ANISOSTATIS"
+#
+#     def _preprocess(self, data):
+#         self.data = data
+#
+#         self.n_datasets = len(self.data)
+#         self.X_, self.X_scaled_ = stack_tables(self.data, self.n_datasets)
+#
+#     def _get_masses(self):
+#         self.M_ = get_M(self.n_observations)
+#         self.table_weights_, self.weights_ev_ = aniso_c1(self.X_scaled_, self.M_)
+#         self.A_ = get_A_ANISOSTATIS(self.table_weights_)
+#
+#     def add_suptable(self, Xsup):
+#
+#         print("Supplementary tables for ANISOSTATIS not yet supported")
+#
+# class COVSTATIS(STATIS):
+#     def __repr__(self):
+#         return "COVSTATIS"
+#
+#     def _preprocess(self, data):
+#         self.data = gen_affinity_input(data, type='double_center')
+#
+#         self.n_datasets = len(self.data)
+#         self.X_, self.X_scaled_ = stack_tables(self.data, self.n_datasets)
+#
+#     def add_suptable(self, Xsup):
+#
+#         print("Supplementary tables for COVSTATIS not yet supported")
+#
+# class dualSTATIS(STATIS):
+#     def __repr__(self):
+#         return "dualSTATIS"
+#
+#     def _preprocess(self, data):
+#         self.data = gen_affinity_input(data, type='covariance')
+#
+#         self.n_datasets = len(self.data)
+#         self.X_, self.X_scaled_ = stack_tables(self.data, self.n_datasets)
+#
+#     def add_suptable(self, Xsup):
+#
+#         print("Supplementary tables for dualSTATIS not yet supported")

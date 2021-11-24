@@ -1,6 +1,7 @@
 from __future__ import print_function
 import numpy as np
 from scipy.sparse.linalg import eigs
+from scipy import sparse
 from sklearn.utils.extmath import randomized_svd
 
 
@@ -47,79 +48,42 @@ def aniso_c1(X, M):
     print('Done!')
     return Mn, ev
 
-def get_A_STATIS(data, table_weights, n_datasets):
+def get_A_STATIS(data, table_weights, n_datasets, mode='sparse'):
     """
     Dataset masses.
-
     """
 
     print("Dataset/variable masses... ", end='')
+
     a = np.concatenate([np.repeat(table_weights[i], data[i].n_var) for i in range(n_datasets)])
 
-    return np.diag(a)
+    if mode=='sparse':
+        return sparse.diags(a, format='csr')
+    else:
+        return np.diag(a)
 
 def get_A_ANISOSTATIS(table_weights):
 
     return np.diag(table_weights)
 
 
-def get_M(n_obs):
+def get_M(n_obs, mode='sparse'):
     """
     Masses for observations. These are assumed to be equal.
     """
 
+    if mode=='sparse':
+        masses = sparse.eye(n_obs, format='csr') / n_obs
+    else:
+        masses = np.eye(n_obs) / n_obs
+
     print("Observation masses: Done!")
+    return(masses)
 
-    return np.eye(n_obs) / n_obs
 
-def stack_tables(data, n_datasets):
-    """
-    Stacks preprocessed tables horizontally
-    """
-
-    print("Stack datasets for GSVD...", end='')
-
-    X = np.concatenate([data[i].data_std_ for i in range(n_datasets)], axis=1)
-    X_scaled = np.concatenate([data[i].data_scaled_ for i in range(n_datasets)], axis=1)
-
-    print("Done!")
-    return X, X_scaled
-
-def get_col_indices(data, ids, groups, ugroups):
-
-    """
-    Returns dict(s) that maps IDs to columns
-
-    :return:
-    """
-
-    print('Getting indices... ', end = '')
-
-    col_indices = []
-    c = 0
-    for i, u in enumerate(ids):
-        col_indices.append(np.arange(c, c + data[i].n_var))
-        c += data[i].n_var
-
-    grp_indices = []
-    for i, ug in enumerate(ugroups):
-        ginds = []
-        for g in ug:
-            ginds.append(np.concatenate(list(map(col_indices.__getitem__, np.where(groups[:, i] == g)[0]))))
-        grp_indices.append(ginds)
-
-    print('Done!')
-
-    return col_indices, grp_indices
-
-def gsvd(X, M, A, n_comps = 10):
+def gsvd(X, M, A, n_comps = 10, mode='sparse'):
     """
     Generalized SVD
-
-    :param X:
-    :param M:
-    :param A:
-    :return:
     """
 
     print("GSVD")
@@ -129,6 +93,7 @@ def gsvd(X, M, A, n_comps = 10):
 
     print("GSVD: SVD... ", end='')
     [P_, D, Q_] = randomized_svd(Xw, n_comps)
+    # print(P_, D, Q_)
 
     #P_ = P_[:,0:n_comps]
     #D = D[0:n_comps]
@@ -136,8 +101,12 @@ def gsvd(X, M, A, n_comps = 10):
     print('Done!')
 
     print("GSVD: Factor scores and eigenvalues... ", end='')
-    Mp = np.power(np.diag(M), -0.5)
-    Ap = np.power(np.diag(A), -0.5)
+    if mode=='sparse':
+        Mp = np.power(M.diagonal(0), -0.5)
+        Ap = np.power(A.diagonal(0), -0.5)
+    else:
+        Mp = np.power(np.diag(M), -0.5)
+        Ap = np.power(np.diag(A), -0.5)
 
     P = np.dot(np.diag(Mp), P_)
     Q = np.dot(np.diag(Ap), Q_.T)

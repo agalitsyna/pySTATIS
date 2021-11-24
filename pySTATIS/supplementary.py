@@ -3,8 +3,10 @@ import numpy as np
 from .helpers import gen_affinity_input
 
 
-def add_suptable_STATIS(Xsup, data, P, D, M, U, theta, n_datasets):
+def add_suptable_STATIS(Xsup, data, P, D, M, U, theta, n_datasets, mode='dense'):
 
+    if method=='sparse':
+        raise ValueError('Mode "sparse" is not implemented yet for add_suptable_STATIS')
     QSup = Xsup.data_std_.T.dot(M.dot(P.dot(np.diag(1 / D))))
     FSup = Xsup.data_std_.dot(QSup)
 
